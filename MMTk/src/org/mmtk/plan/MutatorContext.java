@@ -125,7 +125,29 @@ public abstract class MutatorContext implements Constants {
 
   /** Per-mutator allocator into the non moving space */
   protected final MarkSweepLocal nonmove = new MarkSweepLocal(Plan.nonMovingSpace);
+  
+  /** CHA stuff */
+  private boolean inWriteBarrier;
 
+  @Inline
+  public void setInWriteBarrier() {
+    inWriteBarrier = true;
+  }
+  
+  @Inline
+  public void setNotInWriteBarrier() {
+    inWriteBarrier = false;
+    /**
+     * We may have triggered an asynchronous collection while the
+     * write barrier was enabled, so we have to check for correctness.
+     */
+    Plan.checkForAsyncCollection();     
+  }
+  
+  @Inline
+  public boolean isInWriteBarrier() {
+    return inWriteBarrier;
+  }
 
   /****************************************************************************
    *
@@ -1114,6 +1136,23 @@ public abstract class MutatorContext implements Constants {
   }
 
   /**
+   * Strobe forwarding array write barrier
+   *
+   * This is a special write barrier that records the address of the forwarding
+   * word in an object whenever the reference from the forwarding array to an
+   * object snapshot would require a remset entry
+   *
+   * @param forwardingarray A reference to the forwarding array
+   * @param forwardingaddress The address of the forwarding word in the object header
+   * @param snapshot A reference to the object snapshot
+   */
+  @Inline
+  public void forwardingArrayWriteBarrier(ObjectReference forwardingarray, Address forwardingaddress, ObjectReference snapshot)
+  {
+    if (VM.VERIFY_ASSERTIONS) VM.assertions._assert(false);
+  }
+
+  /**
    * Read an object reference. Take appropriate read barrier action, and
    * return the value that was read.<p> This is a <b>substituting<b>
    * barrier.  The call to this barrier takes the place of a load.<p>
@@ -1223,6 +1262,7 @@ public abstract class MutatorContext implements Constants {
     flushRememberedSets();
     smcode.flush();
     nonmove.flush();
+    flushDirtyBuffers();
   }
 
   /**
@@ -1244,6 +1284,28 @@ public abstract class MutatorContext implements Constants {
     // Either: write barriers are used and this is overridden, or
     // write barriers are not used and this is a no-op
   }
+
+  /**
+   * Flush local dirty buffers
+   *
+   * Flush any dirty forwarding arrays to the global
+   * SharedDeques. Called by SimpleMutator during GC.
+   * Implementation in RVMThread.
+   */
+  public void flushDirtyBuffers() {
+    // Will be overridden by RVMThread
+    VM.assertions.fail("Forgot to override flushDirtyLists!");
+  }
+
+  /**
+   * Assert that the dirty lists have been flushed.  This is critical to
+   * correctness.  We need to maintain the invariant that dirty list entries
+   * do not accrue during GC.
+  public void assertDirtyListsFlushed() {
+    // Will be overridden by RVMThread
+    VM.assertions.fail("Forgot to override assertDirtyListsFlushed!");
+  }
+   */
 
   /***********************************************************************
    *

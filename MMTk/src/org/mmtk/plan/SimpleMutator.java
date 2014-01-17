@@ -14,6 +14,7 @@ package org.mmtk.plan;
 
 import org.mmtk.utility.Log;
 import org.mmtk.vm.VM;
+import org.mmtk.vm.DirtyProcessor;
 
 import org.vmmagic.pragma.*;
 
@@ -60,6 +61,15 @@ public abstract class SimpleMutator extends MutatorContext {
       smcode.prepare();
       nonmove.prepare();
       VM.memory.collectorPrepareVMSpace();
+      return;
+    }
+    
+    if (phaseId == Simple.DIRTIES) {
+      // flushDirtyBuffers(); // Implemented by RVMThread (a subclass of SimpleMutator)
+      /** NOT USED: this turns out to be very slow: */
+      CollectorContext cc = VM.activePlan.collector();
+      Plan glob = VM.activePlan.global();
+      VM.dirtyLists.fixDirtyBuffers(this, cc.getCurrentTrace(), glob.isCurrentGCNursery());
       return;
     }
 

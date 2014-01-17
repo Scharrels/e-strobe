@@ -18,6 +18,14 @@ import static org.jikesrvm.compilers.opt.ir.Operators.CALL;
 import static org.jikesrvm.compilers.opt.ir.Operators.GETFIELD_opcode;
 import static org.jikesrvm.compilers.opt.ir.Operators.GETSTATIC_opcode;
 import static org.jikesrvm.compilers.opt.ir.Operators.INT_ASTORE;
+import static org.jikesrvm.compilers.opt.ir.Operators.BYTE_ALOAD_opcode;
+import static org.jikesrvm.compilers.opt.ir.Operators.UBYTE_ALOAD_opcode;
+import static org.jikesrvm.compilers.opt.ir.Operators.SHORT_ALOAD_opcode;
+import static org.jikesrvm.compilers.opt.ir.Operators.USHORT_ALOAD_opcode;
+import static org.jikesrvm.compilers.opt.ir.Operators.INT_ALOAD_opcode;
+import static org.jikesrvm.compilers.opt.ir.Operators.FLOAT_ALOAD_opcode;
+import static org.jikesrvm.compilers.opt.ir.Operators.LONG_ALOAD_opcode;
+import static org.jikesrvm.compilers.opt.ir.Operators.DOUBLE_ALOAD_opcode;
 import static org.jikesrvm.compilers.opt.ir.Operators.MONITORENTER_opcode;
 import static org.jikesrvm.compilers.opt.ir.Operators.MONITOREXIT_opcode;
 import static org.jikesrvm.compilers.opt.ir.Operators.NEWARRAY_UNRESOLVED_opcode;
@@ -447,7 +455,7 @@ public final class ExpandRuntimeServices extends CompilerPhase {
         break;
 
         case REF_ALOAD_opcode: {
-          if (NEEDS_OBJECT_ALOAD_BARRIER) {
+          if ((ir.gc.isConcurrentCheck && inst.position.getInlineDepth() == 0) || NEEDS_OBJECT_ALOAD_BARRIER) {
             RVMMethod target = Entrypoints.objectArrayReadBarrierMethod;
             Instruction rb =
               Call.create2(CALL,
@@ -462,6 +470,70 @@ public final class ExpandRuntimeServices extends CompilerPhase {
             inst.replace(rb);
             next = rb.prevInstructionInCodeOrder();
             inline(rb, ir, true);
+          }
+        }
+        break;
+        
+        case BYTE_ALOAD_opcode: {
+          if ((ir.gc.isConcurrentCheck && inst.position.getInlineDepth() == 0) || NEEDS_BYTE_ALOAD_BARRIER) {
+            primitiveArrayReadHelper(Entrypoints.byteBooleanArrayReadBarrierMethod, inst, next, ir);
+          }
+        }
+        break;
+        
+        case UBYTE_ALOAD_opcode: {
+          if ((ir.gc.isConcurrentCheck && inst.position.getInlineDepth() == 0) || NEEDS_BOOLEAN_ALOAD_BARRIER) {
+            primitiveArrayReadHelper(Entrypoints.byteBooleanArrayReadBarrierMethod, inst, next, ir);
+          }
+        }
+        break;
+        
+        case SHORT_ALOAD_opcode: {
+          if ((ir.gc.isConcurrentCheck && inst.position.getInlineDepth() == 0) || NEEDS_SHORT_ALOAD_BARRIER || NEEDS_CHAR_ALOAD_BARRIER) {
+            RVMMethod target = null; 
+            if (ALoad.getArray(inst).getType().peekType().asArray().getElementType().isShortType()) {
+              target = Entrypoints.shortArrayReadBarrierMethod;
+            } else if (ALoad.getArray(inst).getType().peekType().asArray().getElementType().isCharType()){
+              target = Entrypoints.charArrayReadBarrierMethod;
+            } else {
+              if (VM.VerifyAssertions) VM._assert(false);
+            }
+            primitiveArrayReadHelper(target, inst, next, ir);
+          }
+        }
+        break;
+        
+        case USHORT_ALOAD_opcode: {
+          if ((ir.gc.isConcurrentCheck && inst.position.getInlineDepth() == 0) || NEEDS_CHAR_ALOAD_BARRIER) {
+            primitiveArrayReadHelper(Entrypoints.charArrayReadBarrierMethod, inst, next, ir);
+          }
+        }
+        break;
+        
+        case INT_ALOAD_opcode: {
+          if ((ir.gc.isConcurrentCheck && inst.position.getInlineDepth() == 0) || NEEDS_INT_ALOAD_BARRIER) {
+            primitiveArrayReadHelper(Entrypoints.intArrayReadBarrierMethod, inst, next, ir);
+          }
+        }
+        break;
+        
+        case FLOAT_ALOAD_opcode: {
+          if ((ir.gc.isConcurrentCheck && inst.position.getInlineDepth() == 0) || NEEDS_FLOAT_ALOAD_BARRIER) {
+            primitiveArrayReadHelper(Entrypoints.floatArrayReadBarrierMethod, inst, next, ir);
+          }
+        }
+        break;
+        
+        case LONG_ALOAD_opcode: {
+          if ((ir.gc.isConcurrentCheck && inst.position.getInlineDepth() == 0) || NEEDS_LONG_ALOAD_BARRIER) {
+            primitiveArrayReadHelper(Entrypoints.longArrayReadBarrierMethod, inst, next, ir);
+          }
+        }
+        break;
+        
+        case DOUBLE_ALOAD_opcode: {
+          if ((ir.gc.isConcurrentCheck && inst.position.getInlineDepth() == 0) || NEEDS_DOUBLE_ALOAD_BARRIER) {
+            primitiveArrayReadHelper(Entrypoints.doubleArrayReadBarrierMethod, inst, next, ir);
           }
         }
         break;
@@ -526,30 +598,74 @@ public final class ExpandRuntimeServices extends CompilerPhase {
         break;
 
         case GETFIELD_opcode: {
-          if (NEEDS_OBJECT_GETFIELD_BARRIER) {
+          TypeReference fieldType = GetField.getResult(inst).getType();
+          if (((ir.gc.isConcurrentCheck && inst.position.getInlineDepth() == 0) || NEEDS_OBJECT_GETFIELD_BARRIER) && fieldType.isReferenceType()) {
             LocationOperand loc = GetField.getLocation(inst);
             FieldReference fieldRef = loc.getFieldRef();
-            if (GetField.getResult(inst).getType().isReferenceType()) {
-              RVMField field = fieldRef.peekResolvedField();
-              if (field == null || !field.isUntraced()) {
-                RVMMethod target = Entrypoints.objectFieldReadBarrierMethod;
-                Instruction rb =
-                  Call.create3(CALL,
-                               GetField.getClearResult(inst),
-                               IRTools.AC(target.getOffset()),
-                               MethodOperand.STATIC(target),
-                               GetField.getClearGuard(inst),
-                               GetField.getRef(inst).copy(),
-                               GetField.getOffset(inst).copy(),
-                               IRTools.IC(fieldRef.getId()));
-                rb.bcIndex = RUNTIME_SERVICES_BCI;
-                rb.position = inst.position;
-                inst.replace(rb);
-                next = rb.prevInstructionInCodeOrder();
-                inline(rb, ir, true);
-              }
+            RVMField field = fieldRef.peekResolvedField();
+            if (field == null || !field.isUntraced()) {
+              RVMMethod target = Entrypoints.objectFieldReadBarrierMethod;
+              Instruction rb =
+                Call.create3(CALL,
+                    GetField.getClearResult(inst),
+                    IRTools.AC(target.getOffset()),
+                    MethodOperand.STATIC(target),
+                    GetField.getClearGuard(inst),
+                    GetField.getRef(inst).copy(),
+                    GetField.getOffset(inst).copy(),
+                    IRTools.IC(fieldRef.getId()));
+              rb.bcIndex = RUNTIME_SERVICES_BCI;
+              rb.position = inst.position;
+              inst.replace(rb);
+              next = rb.prevInstructionInCodeOrder();
+              inline(rb, ir, true);
             }
-          }
+          } else if ((((ir.gc.isConcurrentCheck && inst.position.getInlineDepth() == 0) || NEEDS_BOOLEAN_GETFIELD_BARRIER) && fieldType.isBooleanType()) ||
+                     (((ir.gc.isConcurrentCheck && inst.position.getInlineDepth() == 0) || NEEDS_BYTE_GETFIELD_BARRIER) && fieldType.isByteType()) ||
+                     (((ir.gc.isConcurrentCheck && inst.position.getInlineDepth() == 0) || NEEDS_SHORT_GETFIELD_BARRIER) && fieldType.isShortType()) ||
+                     (((ir.gc.isConcurrentCheck && inst.position.getInlineDepth() == 0) || NEEDS_CHAR_GETFIELD_BARRIER) && fieldType.isCharType()) ||
+                     (((ir.gc.isConcurrentCheck && inst.position.getInlineDepth() == 0) || NEEDS_INT_GETFIELD_BARRIER) && fieldType.isIntType()) ||
+                     (((ir.gc.isConcurrentCheck && inst.position.getInlineDepth() == 0) || NEEDS_FLOAT_GETFIELD_BARRIER) && fieldType.isFloatType()) ||
+                     (((ir.gc.isConcurrentCheck && inst.position.getInlineDepth() == 0) || NEEDS_LONG_GETFIELD_BARRIER) && fieldType.isLongType()) ||
+                     (((ir.gc.isConcurrentCheck && inst.position.getInlineDepth() == 0) || NEEDS_DOUBLE_GETFIELD_BARRIER) && fieldType.isDoubleType())) {
+            RVMMethod target = null;
+            if (fieldType.isBooleanType()) {
+              target = Entrypoints.booleanFieldReadBarrierMethod;
+            } else if (fieldType.isByteType()) {
+              target = Entrypoints.byteFieldReadBarrierMethod;
+            } else if (fieldType.isShortType()) {
+              target = Entrypoints.shortFieldReadBarrierMethod;
+            } else if (fieldType.isCharType()) {
+              target = Entrypoints.charFieldReadBarrierMethod;
+            } else if (fieldType.isIntType()) {
+              target = Entrypoints.intFieldReadBarrierMethod;
+            } else if (fieldType.isFloatType()) {
+              target = Entrypoints.floatFieldReadBarrierMethod;
+            } else if (fieldType.isLongType()) {
+              target = Entrypoints.longFieldReadBarrierMethod;
+            } else if (fieldType.isDoubleType()) {
+              target = Entrypoints.doubleFieldReadBarrierMethod;
+            } else {
+              if (VM.VerifyAssertions) VM._assert(false);
+            }
+                     
+            LocationOperand loc = GetField.getLocation(inst);
+            FieldReference fieldRef = loc.getFieldRef();
+            Instruction rb =
+              Call.create3(CALL,
+                  GetField.getClearResult(inst),
+                  IRTools.AC(target.getOffset()),
+                  MethodOperand.STATIC(target),
+                  GetField.getClearGuard(inst),
+                  GetField.getRef(inst).copy(),
+                  GetField.getOffset(inst).copy(),
+                  IRTools.IC(fieldRef.getId()));
+            rb.bcIndex = RUNTIME_SERVICES_BCI;
+            rb.position = inst.position;
+            inst.replace(rb);
+            next = rb.prevInstructionInCodeOrder();
+            inline(rb, ir, true);
+          } 
         }
         break;
 
@@ -679,6 +795,29 @@ public final class ExpandRuntimeServices extends CompilerPhase {
     if (ir.options.H2L_INLINE_WRITE_BARRIER) {
       inline(wb, ir, true);
     }
+  }
+  
+  /**
+   * Helper method to generate call to primitive arrayRead write barrier
+   * @param target entry point for read barrier method
+   * @param inst the current instruction
+   * @param next the next instruction
+   * @param ir the IR
+   */
+  private void primitiveArrayReadHelper(RVMMethod target, Instruction inst, Instruction next, IR ir) {
+    Instruction rb =
+      Call.create2(CALL,
+                   ALoad.getClearResult(inst),
+                   IRTools.AC(target.getOffset()),
+                   MethodOperand.STATIC(target),
+                   ALoad.getClearGuard(inst),
+                   ALoad.getArray(inst).copy(),
+                   ALoad.getIndex(inst).copy());
+    rb.bcIndex = RUNTIME_SERVICES_BCI;
+    rb.position = inst.position;
+    inst.replace(rb);
+    next = rb.prevInstructionInCodeOrder();
+    inline(rb, ir, true);
   }
 
   /**

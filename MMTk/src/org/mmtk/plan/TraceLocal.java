@@ -168,6 +168,7 @@ public abstract class TraceLocal extends TransitiveClosure implements Constants 
     } else {
       VM.scanning.scanObject(this, object);
     }
+    VM.objectModel.traceForwardingWord(object, this);
   }
 
 

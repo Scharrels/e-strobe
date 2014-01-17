@@ -16,6 +16,8 @@ import org.jikesrvm.SizeConstants;
 import org.jikesrvm.runtime.Magic;
 import org.mmtk.vm.VM;
 
+import org.mmtk.utility.statistics.*;
+
 import org.vmmagic.unboxed.*;
 import org.vmmagic.pragma.*;
 

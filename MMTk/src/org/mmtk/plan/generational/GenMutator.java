@@ -182,6 +182,24 @@ import org.vmmagic.unboxed.*;
     VM.barriers.objectReferenceWrite(src, tgt, metaDataA, metaDataB, mode);
   }
 
+  /**
+   * Strobe forwarding array write barrier
+   *
+   * This is a special write barrier that records the address of the forwarding
+   * word in an object whenever the reference from the forwarding array to an
+   * object snapshot would require a remset entry
+   *
+   * @param forwardingarray A reference to the forwarding array
+   * @param forwardingaddress The address of the forwarding word in the object header
+   * @param snapshot A reference to the object snapshot
+   */
+  @Inline
+  public final void forwardingArrayWriteBarrier(ObjectReference forwardingarray, 
+                                                Address forwardingaddress, 
+                                                ObjectReference snapshot)
+  {
+    fastPath(forwardingarray, forwardingaddress, snapshot, INSTANCE_FIELD);
+  }
 
   /**
    * Perform the root write barrier fast path, which may involve remembering

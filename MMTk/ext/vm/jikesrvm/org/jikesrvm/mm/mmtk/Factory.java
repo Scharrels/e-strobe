@@ -184,6 +184,22 @@ public final class Factory extends org.mmtk.vm.Factory {
       return null; // never get here
     }
   }
+  
+  /**
+   * Create a new DirtyProcessor instance using the appropriate VM-specific
+   * concrete DirtyProcessor sub-class.
+   *
+   * @see DirtyProcessor
+   * @return A concrete VM-specific DirtyProcessor instance.
+   */
+  public org.mmtk.vm.DirtyProcessor newDirtyProcessor() {
+    try {
+      return DirtyProcessor.get();
+    } catch (Exception e) {
+      VM.sysFail("Failed to allocate new DirtyProcessor!");
+      return null; // never get here
+    }
+  }
 
   /**
    * Create a new FinalizableProcessor instance using the appropriate VM-specific

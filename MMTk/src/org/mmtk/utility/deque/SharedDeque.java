@@ -23,6 +23,7 @@ import org.vmmagic.pragma.Inline;
 import org.vmmagic.pragma.Uninterruptible;
 import org.vmmagic.unboxed.Address;
 import org.vmmagic.unboxed.Offset;
+import org.vmmagic.unboxed.ObjectReference;
 
 /**
  * This supports <i>unsynchronized</i> enqueuing and dequeuing of buffers
@@ -195,6 +196,84 @@ public class SharedDeque extends Deque implements Constants {
     return (int) (bufsenqueued * PAGES_PER_BUFFER);
   }
 
+  /* --------------------------------------------------
+       Support for Strobe: allow us to iterate over
+       the SharedDeque without removing the entries
+     -------------------------------------------------- */
+  
+  public Address currBuf = Address.zero();
+  public Address currAddr = Address.zero();
+  public boolean exhausted = false;
+
+  /**
+   * Must be called before the first call to getNextAddress()
+   * or hasNext(), but after the last modification to the 
+   * SharedDeque.  I.e. call this immediately before iterating
+   * over the SharedDeque.
+   */
+  public final void prepareIterator() {
+    if (head.EQ(HEAD_INITIAL_VALUE) && tail.EQ(TAIL_INITIAL_VALUE)) {
+      exhausted = true;
+    } else {
+      if (VM.VERIFY_ASSERTIONS) {
+        VM.assertions._assert(head.NE(HEAD_INITIAL_VALUE) && tail.NE(TAIL_INITIAL_VALUE));
+      }
+      exhausted = false;
+      // SZG: Because of the way LocalDeque interacts with SharedDeque, the buffer addresses
+      // here actually point to the end of the list of addresses. So, this iterator
+      // moves backward through each buffer, but forward through the linked list of buffers.
+      currBuf = head;
+      currAddr = head; // bufferFirst(currBuf);
+    }
+  }
+
+  /**
+   * Iterate over the addresses of each word in the SharedDeque.
+   * We assume this is being done during GC and that the SharedDeque
+   * is not being accessed by anyone else.
+   * 
+   * @return the address of the next word in the SharedDeque, or null
+   * if exhausted
+   */
+  public final Address getNextAddress() {
+    if (exhausted) {
+      Log.writeln("WEIRD: called getNextAddress on empty deque");
+      return Address.zero();
+    }
+    
+    if (VM.VERIFY_ASSERTIONS) {
+      VM.assertions._assert(!currBuf.isZero() && !currAddr.isZero());
+    }
+    
+    // -- Because ObjectRefereneDeque hands us the address of the end of
+    //    the local buffer, we move backward towards
+    Address nextSlot = currAddr.minus(BYTES_IN_ADDRESS);
+
+    // if this was last addr in buffer, get the next buffer
+    if (bufferOffset(nextSlot).isZero()) {
+      currBuf = getNext(currBuf);
+      currAddr = currBuf;
+      if (currBuf.isZero()) {
+        exhausted = true;
+      }
+    } else {
+      currAddr = nextSlot;
+    }
+
+    // return address
+    return nextSlot;
+  }
+  
+  /**
+   * Will the next call to getNextAddress() return null?
+   * 
+   * @return true if there are more elements, false if not
+   */
+  public boolean hasNext() {
+    return !exhausted;
+  }  
+  
+
   /****************************************************************************
    *
    * Private instance methods and fields
@@ -251,7 +330,7 @@ public class SharedDeque extends Deque implements Constants {
       if (VM.VERIFY_ASSERTIONS) VM.assertions._assert(tail.isZero() && head.isZero());
       // no buffers available
       if (waiting) {
-        int ordinal = TRACE ? 0 : VM.activePlan.collector().getId();
+        int ordinal = TRACE ? VM.activePlan.collector().getId() : 0;
         setNumConsumersWaiting(numConsumersWaiting + 1);
         while (rtn.isZero()) {
           if (numConsumersWaiting == numConsumers)
@@ -493,5 +572,9 @@ public class SharedDeque extends Deque implements Constants {
   private void setTail(Address newTail) {
     tail = newTail;
     VM.memory.sync();
+  }
+
+  public Address getTail() {
+    return tail;
   }
 }

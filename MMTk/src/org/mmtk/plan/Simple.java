@@ -58,6 +58,8 @@ public abstract class Simple extends Plan implements Constants {
   public static final short FINALIZABLE         = Phase.createSimple("finalize", finalizeTime);
   public static final short WEAK_TRACK_REFS     = Phase.createSimple("weak-track-ref", refTypeTime);
   public static final short PHANTOM_REFS        = Phase.createSimple("phantom-ref", refTypeTime);
+  public static final short PREPARE_DIRTIES     = Phase.createSimple("prepare-dirties");
+  public static final short DIRTIES             = Phase.createSimple("dirties");
   public static final short FORWARD             = Phase.createSimple("forward");
   public static final short FORWARD_REFS        = Phase.createSimple("forward-ref", refTypeTime);
   public static final short FORWARD_FINALIZABLE = Phase.createSimple("forward-finalize", finalizeTime);
@@ -136,7 +138,16 @@ public abstract class Simple extends Plan implements Constants {
       Phase.scheduleCollector  (CLOSURE),
       Phase.schedulePlaceholder(WEAK_TRACK_REFS),
       Phase.scheduleCollector  (PHANTOM_REFS));
-
+  
+  /**
+   * Process dirty list, nulling out references to dead objects and
+   * updating references to live/forwarded objects.
+   */
+  protected static final short dirtiesPhase = Phase.createComplex("dirties", null,
+      // Phase.scheduleCollector  (PREPARE_DIRTIES),
+      Phase.scheduleMutator    (DIRTIES),
+      Phase.scheduleCollector  (DIRTIES));
+  
   /**
    * Ensure that all references in the system are correct.
    */
@@ -170,6 +181,7 @@ public abstract class Simple extends Plan implements Constants {
       Phase.scheduleComplex(initPhase),
       Phase.scheduleComplex(rootClosurePhase),
       Phase.scheduleComplex(refTypeClosurePhase),
+      Phase.scheduleComplex(dirtiesPhase),
       Phase.scheduleComplex(forwardPhase),
       Phase.scheduleComplex(completeClosurePhase),
       Phase.scheduleComplex(finishPhase));

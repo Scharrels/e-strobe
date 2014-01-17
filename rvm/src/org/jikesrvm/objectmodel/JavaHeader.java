@@ -71,8 +71,8 @@ import org.vmmagic.unboxed.Word;
 @Uninterruptible
 public class JavaHeader implements JavaHeaderConstants {
 
-  protected static final int SCALAR_HEADER_SIZE = JAVA_HEADER_BYTES + OTHER_HEADER_BYTES;
-  protected static final int ARRAY_HEADER_SIZE = SCALAR_HEADER_SIZE + ARRAY_LENGTH_BYTES;
+  public static final int SCALAR_HEADER_SIZE = JAVA_HEADER_BYTES + OTHER_HEADER_BYTES;
+  public static final int ARRAY_HEADER_SIZE = SCALAR_HEADER_SIZE + ARRAY_LENGTH_BYTES;
 
   /** offset of object reference from the lowest memory word */
   protected static final int OBJECT_REF_OFFSET = ARRAY_HEADER_SIZE;  // from start to ref
@@ -288,6 +288,13 @@ public class JavaHeader implements JavaHeaderConstants {
    * a dynamic hash offset or not using address based
    * hashing. However, the GC algorithm could safely do this in the
    * nursery so we can't assert DYNAMIC_HASH_OFFSET.
+   * 
+   * EEA: Be careful with this method.  I had changed it to look for the 
+   * ALIGNMENT_VALUE instead of just the low-order bit, but this method fails
+   * when ADDRESS_BASED_HASHING is true and the object has been hashed and 
+   * moved. In that case, there is an extra word at the beginning of the
+   * object that contains the hash code.  Just looking for ALIGNMENT_VALUE
+   * doesn't catch that case.  So beware when changing this. 
    */
   public static ObjectReference getObjectFromStartAddress(Address start) {
     if ((start.loadWord().toInt() & ALIGNMENT_MASK) == ALIGNMENT_MASK) {

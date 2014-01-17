@@ -269,8 +269,8 @@ public class Entrypoints {
     getMethod(org.jikesrvm.mm.mminterface.Barriers.class, "booleanArrayWrite", "([ZIZ)V");
   public static final NormalMethod booleanFieldReadBarrierMethod =
     getMethod(org.jikesrvm.mm.mminterface.Barriers.class, "booleanFieldRead", "(Ljava/lang/Object;Lorg/vmmagic/unboxed/Offset;I)Z");
-  public static final NormalMethod booleanArrayReadBarrierMethod =
-    getMethod(org.jikesrvm.mm.mminterface.Barriers.class, "booleanArrayRead", "([ZI)Z");
+  /*public static final NormalMethod booleanArrayReadBarrierMethod =
+    getMethod(org.jikesrvm.mm.mminterface.Barriers.class, "booleanArrayRead", "([ZI)Z"); */
 
   public static final NormalMethod byteFieldWriteBarrierMethod =
     getMethod(org.jikesrvm.mm.mminterface.Barriers.class, "byteFieldWrite", "(Ljava/lang/Object;BLorg/vmmagic/unboxed/Offset;I)V");
@@ -278,8 +278,8 @@ public class Entrypoints {
     getMethod(org.jikesrvm.mm.mminterface.Barriers.class, "byteArrayWrite", "([BIB)V");
   public static final NormalMethod byteFieldReadBarrierMethod =
     getMethod(org.jikesrvm.mm.mminterface.Barriers.class, "byteFieldRead", "(Ljava/lang/Object;Lorg/vmmagic/unboxed/Offset;I)B");
-  public static final NormalMethod byteArrayReadBarrierMethod =
-    getMethod(org.jikesrvm.mm.mminterface.Barriers.class, "byteArrayRead", "([BI)B");
+  public static final NormalMethod byteBooleanArrayReadBarrierMethod =
+    getMethod(org.jikesrvm.mm.mminterface.Barriers.class, "byteBooleanArrayRead", "([BI)B");
 
   public static final NormalMethod charFieldWriteBarrierMethod =
     getMethod(org.jikesrvm.mm.mminterface.Barriers.class, "charFieldWrite", "(Ljava/lang/Object;CLorg/vmmagic/unboxed/Offset;I)V");
@@ -444,6 +444,13 @@ public class Entrypoints {
 
   public static final RVMField edgeCountersField =
       getField(org.jikesrvm.compilers.baseline.EdgeCounts.class, "data", int[][].class);
+
+  //////////////////
+  // Entrypoint for Strobe
+  //////////////////
+
+  public static final RVMField activeProbesField = getField(org.jikesrvm.cha.Snapshot.class,
+                                                            "activeProbes", int.class);
 
   //////////////////
   // Entrypoints that are valid only when the opt compiler is included in the build

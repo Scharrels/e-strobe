@@ -33,6 +33,8 @@ import org.vmmagic.pragma.Unpreemptible;
 import org.vmmagic.unboxed.Offset;
 import static org.jikesrvm.classloader.TypeReference.baseReflectionClass;
 
+import org.jikesrvm.scheduler.RVMThread;
+
 /**
  * A method of a java class corresponding to a method_info structure
  * in the class file. A method is read from a class file using the
@@ -726,6 +728,13 @@ public abstract class RVMMethod extends RVMMember implements BytecodeConstants {
 
     if (VM.TraceClassLoading && VM.runningVM) VM.sysWrite("RVMMethod: (begin) compiling " + this + "\n");
 
+    // -- Don't snapshot compiler stuff
+    boolean makeSnapshots = false;
+    if (VM.runningVM) {
+      makeSnapshots = RVMThread.getCurrentThread().makeSnapshots();
+      RVMThread.getCurrentThread().turnOffSnapshots();
+    }
+
     CompiledMethod cm = genCode();
 
     // Ensure that cm wasn't invalidated while it was being compiled.
@@ -735,6 +744,12 @@ public abstract class RVMMethod extends RVMMember implements BytecodeConstants {
       } else {
         currentCompiledMethod = cm;
       }
+    }
+
+    // -- All done, turn snapshots back on
+    if (VM.runningVM) {
+      if (makeSnapshots)
+        RVMThread.getCurrentThread().turnOnSnapshots();
     }
 
     if (VM.TraceClassLoading && VM.runningVM) VM.sysWrite("RVMMethod: (end)   compiling " + this + "\n");

@@ -536,8 +536,8 @@ public final class MemoryManager implements HeapLayoutConstants, Constants {
   /**
    * Allocate an array object.
    *
-   * @param numElements The number of element bytes
-   * @param size size in bytes of array header
+   * @param numElements The number of elements
+   * @param size size in bytes of array including header
    * @param tib type information block for array object
    * @param allocator int that encodes which allocator should be used
    * @param align the alignment requested; must be a power of 2.
@@ -548,7 +548,7 @@ public final class MemoryManager implements HeapLayoutConstants, Constants {
    * See also: bytecode 0xbc ("newarray") and 0xbd ("anewarray")
    */
   @Inline
-  private static Object allocateArrayInternal(int numElements, int size, TIB tib, int allocator,
+  public static Object allocateArrayInternal(int numElements, int size, TIB tib, int allocator,
                                               int align, int offset, int site) {
     Selected.Mutator mutator = Selected.Mutator.get();
     allocator = mutator.checkAllocator(org.jikesrvm.runtime.Memory.alignUp(size, MIN_ALIGNMENT), align, allocator);
@@ -650,6 +650,65 @@ public final class MemoryManager implements HeapLayoutConstants, Constants {
     int allocator = isHot ? Plan.ALLOC_HOT_CODE : Plan.ALLOC_COLD_CODE;
 
     return (CodeArray) allocateArray(numInstrs, width, headerSize, tib, allocator, align, offset, Plan.DEFAULT_SITE);
+  }
+  
+  /**
+   * Allocate raw space for a CHA snapshot and initialize headers.
+   * Will be called from the write barrier, so must be uninterruptible 
+   * and cannot recursively invoke the write barrier.
+   * 
+   * @param size The size of the region to allocate, in bytes
+   * @param align the alignment requested; must be a power of 2. 
+   * @return The start of the memory region that has been allocated
+   */
+  @Inline
+  @Uninterruptible
+  public static ObjectReference allocateSnapshotSpaceScalar(int size, RVMType type) {
+    if (VM.VerifyAssertions) VM._assert(type.isClassType());
+    
+    // get alignment, offset, and allocator info based on type
+    int align = ObjectModel.getAlignment((RVMClass)type);
+    int offset = ObjectModel.getOffsetForAlignment((RVMClass)type, false);
+    int allocator = Plan.ALLOC_DEFAULT; // TODO: should this be pickAllocatorForType()?
+    Selected.Mutator mutator = Selected.Mutator.get();
+    allocator = mutator.checkAllocator(org.jikesrvm.runtime.Memory.alignUp(size, MIN_ALIGNMENT), align, allocator);   
+        
+    // allocate
+    TIB tib = type.getTypeInformationBlock();
+    Address region = allocateSpace(mutator, size, align, offset, allocator, Plan.DEFAULT_SITE);
+    Object result = ObjectModel.initializeScalar(region, tib, size);
+    mutator.postAlloc(ObjectReference.fromObject(result), ObjectReference.fromObject(tib), size, allocator);
+    return ObjectReference.fromObject(result);
+  }
+  
+  /**
+   * Allocate raw space for a CHA snapshot and initialize headers.
+   * Will be called from the write barrier, so must be uninterruptible 
+   * and cannot recursively invoke the write barrier.
+   * 
+   * @param size The size of the region to allocate, in bytes
+   * @param align the alignment requested; must be a power of 2. 
+   * @return The start of the memory region that has been allocated
+   */
+  @Inline
+  @Uninterruptible
+  public static ObjectReference allocateSnapshotSpaceArray(int size, RVMType type, int numElems) {
+    if (VM.VerifyAssertions) VM._assert(type.isArrayType());
+    
+    // get alignment, offset, and allocator info based on type
+    int align = ObjectModel.getAlignment((RVMArray)type);
+    int offset = ObjectModel.getOffsetForAlignment((RVMArray)type, false);
+    int allocator = Plan.ALLOC_DEFAULT; // TODO: should this be pickAllocatorForType()?
+    Selected.Mutator mutator = Selected.Mutator.get();
+    allocator = mutator.checkAllocator(org.jikesrvm.runtime.Memory.alignUp(size, MIN_ALIGNMENT), align, allocator);
+        
+    // allocate
+    //return allocateSpace(mutator, size, align, offset, allocator, Plan.DEFAULT_SITE);
+    TIB tib = type.getTypeInformationBlock();
+    Address region = allocateSpace(mutator, size, align, offset, allocator, Plan.DEFAULT_SITE);
+    Object result = ObjectModel.initializeArray(region, tib, numElems, size);
+    mutator.postAlloc(ObjectReference.fromObject(result), ObjectReference.fromObject(tib), size, allocator);
+    return ObjectReference.fromObject(result);
   }
 
   /**

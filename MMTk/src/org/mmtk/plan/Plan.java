@@ -28,6 +28,8 @@ import org.mmtk.utility.options.*;
 import org.mmtk.utility.sanitychecker.SanityChecker;
 import org.mmtk.utility.statistics.Timer;
 import org.mmtk.utility.statistics.Stats;
+import org.mmtk.utility.statistics.EventCounter;
+import org.mmtk.utility.statistics.SizeCounter;
 
 import org.mmtk.vm.VM;
 import org.mmtk.vm.Collection;
@@ -156,6 +158,10 @@ public abstract class Plan implements Constants {
 
   /** Global sanity checking state **/
   public static final SanityChecker sanityChecker = new SanityChecker();
+
+  /** Stats for Strobe */
+  public static final SizeCounter bytesCounter = new SizeCounter("snapshots", true, true);
+  public static final Timer waitTime = new Timer("waiting", false, true);
 
   /****************************************************************************
    * Constructor.
@@ -584,6 +590,17 @@ public abstract class Plan implements Constants {
    */
   @Interruptible
   public static void harnessBegin() {
+
+    // Strobe: make sure all checkers are done
+    VM.statistics.waitAllCheckersDone();
+    int num = VM.statistics.getNumCheckers();
+    if (num > 0) {
+      Log.writeln("WARNING: active checkers still running ", num);
+    }
+
+    // Stop adaptive compiler
+    VM.statistics.stopAdaptiveCompiler();
+
     // Save old values.
     boolean oldFullHeap = Options.fullHeapSystemGC.getValue();
     boolean oldIgnore = Options.ignoreSystemGC.getValue();
@@ -831,6 +848,13 @@ public abstract class Plan implements Constants {
         /* This is not, in general, in a GC safe point. */
         return false;
       }
+      
+
+      if (VM.activePlan.mutator().isInWriteBarrier()) {
+        logPoll(space, "CHA: don't join collection");
+        return false;
+      }
+
       /* Someone else initiated a collection, we should join it */
       logPoll(space, "Joining collection");
       VM.collection.joinCollection();
@@ -847,6 +871,16 @@ public abstract class Plan implements Constants {
         setAwaitingAsyncCollection();
         return false;
       }
+      
+      /* CHA: If the collection happened because of an allocation in a 
+       * write barrier, then request an asynchronous collection.
+       */
+      if (VM.activePlan.mutator().isInWriteBarrier()) {
+        logPoll(space, "Asynchronous collection requested");
+        setAwaitingAsyncCollection();
+        return false;
+      }
+
       logPoll(space, "Triggering collection");
       VM.collection.triggerCollection(Collection.RESOURCE_GC_TRIGGER);
       return true;

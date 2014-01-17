@@ -203,6 +203,11 @@ public final class GenerationContext implements org.jikesrvm.compilers.opt.drive
    * Do we do check stores?
    */
   boolean doesCheckStore;
+  
+  /**
+   * Is this method a concurrent check?
+   */
+  public boolean isConcurrentCheck;
 
   //////////
   // Main public methods
@@ -229,6 +234,7 @@ public final class GenerationContext implements org.jikesrvm.compilers.opt.drive
     inlinePlan = ip;
     inlineSequence = new InlineSequence(meth);
     doesCheckStore = !meth.hasNoCheckStoreAnnotation();
+    isConcurrentCheck = meth.hasConcurrentCheckAnnotation();
 
     // Create the CFG. Initially contains prologue, epilogue, and exit.
     cfg = new ControlFlowGraph(0);

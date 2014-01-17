@@ -30,7 +30,7 @@ public interface MiscHeaderConstants extends Constants {
    */
 
   /* amount by which tracing causes headers to grow */ int GC_TRACING_HEADER_WORDS =
-      (MemoryManagerConstants.GENERATE_GC_TRACE ? 3 : 0);
+      (MemoryManagerConstants.GENERATE_GC_TRACE ? 3 : 0) + 2;
   int GC_TRACING_HEADER_BYTES = GC_TRACING_HEADER_WORDS << LOG_BYTES_IN_ADDRESS;
 
   /**

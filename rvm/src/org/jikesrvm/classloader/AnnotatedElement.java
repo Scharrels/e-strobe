@@ -375,4 +375,12 @@ public abstract class AnnotatedElement implements java.lang.reflect.AnnotatedEle
   public final boolean hasNonMovingAllocationAnnotation() {
     return isAnnotationDeclared(TypeReference.NonMovingAllocation);
   }
+  
+  /**
+   * Return true if this element has a ConcurrentCheck annotation.
+   * @see org.vmmagic.pragma.ConcurrentCheck
+   */
+  public final boolean hasConcurrentCheckAnnotation() {
+    return isAnnotationDeclared(TypeReference.ConcurrentCheck);
+  }
 }

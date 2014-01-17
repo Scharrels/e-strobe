@@ -118,6 +118,15 @@ public abstract class Factory {
    * @return A concrete VM-specific ReferenceProcessor instance.
    */
   public abstract ReferenceProcessor newReferenceProcessor(ReferenceProcessor.Semantics semantics);
+  
+  /**
+   * Create a new DirtyProcessor instance using the appropriate VM-specific
+   * concrete DirtyProcessor sub-class.
+   *
+   * @see DirtyProcessor
+   * @return A concrete VM-specific DirtyProcessor instance.
+   */
+  public abstract DirtyProcessor newDirtyProcessor();
 
 
   /**

@@ -12,10 +12,13 @@
  */
 package org.jikesrvm.mm.mmtk;
 
+import org.mmtk.plan.TraceLocal;
 import org.mmtk.utility.alloc.Allocator;
 
+import org.jikesrvm.VM;
 import org.jikesrvm.runtime.Magic;
 import org.jikesrvm.objectmodel.JavaHeaderConstants;
+import org.jikesrvm.objectmodel.MiscHeader;
 import org.jikesrvm.objectmodel.TIB;
 import org.jikesrvm.classloader.Atom;
 import org.jikesrvm.classloader.RVMArray;
@@ -426,6 +429,26 @@ import org.vmmagic.pragma.*;
    */
   public void dumpObject(ObjectReference object) {
     DebugUtil.dumpRef(object);
-  }
+  } 
+  
+  /**
+   * Trace forwarding word in object header
+   * 
+   * @param object The object whose forwarding word to trace
+   * @param trace The trace to use
+   */
+  @Inline
+  public void traceForwardingWord(ObjectReference object, TraceLocal trace) {
+    Address slot = object.toAddress().plus(MiscHeader.FORWARDING_WORD_OFFSET);
+    ObjectReference fw = slot.loadObjectReference();
+    if (!fw.isNull() && (Magic.getObjectType(fw.toObject()) != RVMType.ObjectReferenceArrayType)) {
+      VM.sysWrite("object ", object);
+      VM.sysWrite(" has a corrupt forwarding pointer of type ");
+      VM.sysWriteln(Magic.getObjectType(fw.toObject()).getDescriptor());
+      return;
+    }
+    trace.processEdge(object, slot);
+  } 
+
 }
 

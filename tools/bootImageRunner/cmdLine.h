@@ -38,8 +38,9 @@ static const int OPT_INDEX                     = BASE_INDEX+1;
 static const int VMCLASSES_INDEX               = OPT_INDEX+1;
 static const int CPUAFFINITY_INDEX             = VMCLASSES_INDEX+1;
 static const int PROCESSORS_INDEX              = CPUAFFINITY_INDEX+1;
+static const int CHA_THREADS_INDEX             = PROCESSORS_INDEX+1;
 
-static const int numNonstandardArgs      = PROCESSORS_INDEX+1;
+static const int numNonstandardArgs      = CHA_THREADS_INDEX+1;
 
 static const char* nonStandardArgs[numNonstandardArgs] = {
    "-X",
@@ -61,6 +62,7 @@ static const char* nonStandardArgs[numNonstandardArgs] = {
    "-X:vmClasses=",
    "-X:cpuAffinity=",
    "-X:processors=",
+   "-X:CHAthreads=",
 };
 
 // a NULL-terminated list.
@@ -95,6 +97,7 @@ static const char* nonStandardUsage[] = {
    "    -Xbootclasspath/a:<cp>   (a)ppend specified classpath to bootclasspath",
    "    -X:cpuAffinity=<number>  physical cpu to which 1st VP is bound",
    "    -X:processors=<number|\"all\">  no. of virtual processors",
+   "    -X:CHAthreads=<number>   no. of CHA checking threads",
    NULL                         /* End of messages */
 };
 

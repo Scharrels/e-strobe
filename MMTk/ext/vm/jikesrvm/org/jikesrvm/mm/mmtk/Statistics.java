@@ -19,6 +19,9 @@ import static org.jikesrvm.runtime.SysCall.sysCall;
 
 import org.jikesrvm.mm.mminterface.MemoryManager;
 
+import org.jikesrvm.mm.mminterface.CHAInterface;
+import org.jikesrvm.cha.CheckingThread;
+
 import org.vmmagic.pragma.*;
 
 @Uninterruptible
@@ -106,6 +109,30 @@ public final class Statistics extends org.mmtk.vm.Statistics implements Constant
    */
   public void perfEventRead(int id, long[] values) {
     sysCall.sysPerfEventRead(id, values);
+  }
+
+  /**
+   * Strobe: Get number of active checking threads
+   */
+  public int getNumCheckers()
+  {
+    return CHAInterface.curActiveCheckers;
+  }
+
+  /**
+   * Strobe: Wait for all checkers to finish
+   */
+  public void waitAllCheckersDone()
+  {
+    CheckingThread.waitAllDone();
+  }
+
+  /**
+   * Strobe: stop the adpative compiler
+   */
+  public void stopAdaptiveCompiler()
+  {
+    org.jikesrvm.adaptive.controller.Controller.stop();
   }
 }
 

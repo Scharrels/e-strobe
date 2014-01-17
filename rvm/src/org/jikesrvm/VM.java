@@ -15,6 +15,8 @@ package org.jikesrvm;
 import org.jikesrvm.ArchitectureSpecific.ThreadLocalState;
 import org.jikesrvm.adaptive.controller.Controller;
 import org.jikesrvm.adaptive.util.CompilerAdvice;
+import org.jikesrvm.cha.CheckingThread;
+import org.jikesrvm.cha.Snapshot;
 import org.jikesrvm.classloader.Atom;
 import org.jikesrvm.classloader.BootstrapClassLoader;
 import org.jikesrvm.classloader.RVMClass;
@@ -28,6 +30,7 @@ import org.jikesrvm.compilers.baseline.BaselineCompiler;
 import org.jikesrvm.compilers.baseline.EdgeCounts;
 import org.jikesrvm.compilers.common.BootImageCompiler;
 import org.jikesrvm.compilers.common.RuntimeCompiler;
+import org.jikesrvm.mm.mminterface.CHAInterface;
 import org.jikesrvm.mm.mminterface.MemoryManager;
 import org.jikesrvm.runtime.BootRecord;
 import org.jikesrvm.runtime.DynamicLibrary;
@@ -271,6 +274,7 @@ public class VM extends Properties implements Constants, ExitStatus {
     // Among other things, after this returns, GC and dynamic class loading are enabled.
     //
     if (verboseBoot >= 1) VM.sysWriteln("Booting scheduler");
+    CHAInterface.init();
     RVMThread.boot();
     DynamicLibrary.boot();
 
@@ -383,7 +387,7 @@ public class VM extends Properties implements Constants, ExitStatus {
     if (VM.BuildForGnuClasspath) {
       runClassInitializer("java.lang.VMClassLoader");
     }
-
+    
     if (verboseBoot >= 1) VM.sysWriteln("initializing standard streams");
     // Initialize java.lang.System.out, java.lang.System.err, java.lang.System.in
     FileSystem.initializeStandardStreams();
@@ -427,6 +431,14 @@ public class VM extends Properties implements Constants, ExitStatus {
     //
     if (verboseBoot >= 1) VM.sysWriteln("Initializing runtime compiler");
     RuntimeCompiler.boot();
+    
+    // Initialize CHA checking threads
+    CheckingThread.boot();
+    Snapshot.init();
+    for (int i=0; i<RVMThread.numCHAThreads; i++) {
+      CheckingThread ct = new CheckingThread();
+      ct.start();
+    }
 
     // Process remainder of the VM's command line arguments.
     if (verboseBoot >= 1) VM.sysWriteln("Late stage processing of command line");
@@ -1478,6 +1490,17 @@ public class VM extends Properties implements Constants, ExitStatus {
   }
 
   @NoInline
+  public static void sysWriteln(String s, ObjectReference r, String s2, Atom a) {
+    swLock();
+    write(s);
+    write(r);
+    write(s2);
+    write(a);
+    writeln();
+    swUnlock();
+  }
+
+  @NoInline
   public static void sysWrite(String s, Offset o) {
     swLock();
     write(s);
@@ -2079,6 +2102,8 @@ public class VM extends Properties implements Constants, ExitStatus {
   private static void showThread() {
     write("Thread ");
     write(RVMThread.getCurrentThread().getThreadSlot());
+    write(" ");
+    write(RVMThread.getCurrentThread().getName());
     write(": ");
   }
 
@@ -2177,6 +2202,18 @@ public class VM extends Properties implements Constants, ExitStatus {
   }
 
   @NoInline
+  public static void tsysWriteln(String s1, int i1, String s2, int i2) {
+    swLock();
+    showThread();
+    write(s1);
+    write(i1);
+    write(s2);
+    write(i2);
+    writeln();
+    swUnlock();
+  }
+
+  @NoInline
   public static void tsysWriteln(String s, Address a) {
     swLock();
     showThread();
@@ -2244,6 +2281,66 @@ public class VM extends Properties implements Constants, ExitStatus {
     write(a4);
     write(s5);
     write(a5);
+    writeln();
+    swUnlock();
+  }
+
+  @NoInline
+  public static void tsysWriteln(String s1, ObjectReference o1, String s2, Atom a1) {
+    swLock();
+    showThread();
+    write(s1);
+    write(o1);
+    write(s2);
+    write(a1);
+    writeln();
+    swUnlock();
+  }
+
+  @NoInline
+  public static void tsysWriteln(String s1, ObjectReference o1) {
+    swLock();
+    showThread();
+    write(s1);
+    write(o1);
+    writeln();
+    swUnlock();
+  }
+
+  @NoInline
+  public static void tsysWriteln(String s1, ObjectReference o1, String s2, ObjectReference o2, String s3, Atom a1) {
+    swLock();
+    showThread();
+    write(s1);
+    write(o1);
+    write(s2);
+    write(o2);
+    write(s3);
+    write(a1);
+    writeln();
+    swUnlock();
+  }
+
+  @NoInline
+  public static void tsysWriteln(String s1, Atom a1) {
+    swLock();
+    showThread();
+    write(s1);
+    write(a1);
+    writeln();
+    swUnlock();
+  }
+
+  @NoInline
+  public static void tsysWriteln(String s1, ObjectReference o, String s2, Atom a1, String s3, int i1) {
+    swLock();
+    showThread();
+    write(s1);
+    write(o);
+    write(s2);
+    write(a1);
+    write(s3);
+    write(i1);
     writeln();
     swUnlock();
   }

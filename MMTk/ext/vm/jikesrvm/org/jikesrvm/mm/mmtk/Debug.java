@@ -12,7 +12,9 @@
  */
 package org.jikesrvm.mm.mmtk;
 
+import org.jikesrvm.mm.mminterface.DebugUtil;
 import org.vmmagic.pragma.Uninterruptible;
+import org.vmmagic.unboxed.ObjectReference;
 
 /**
  * Debugger support for the MMTk harness
@@ -28,4 +30,8 @@ public final class Debug extends org.mmtk.vm.Debug {
     return false;
   }
 
+  @Override
+  public boolean validRef(ObjectReference ref) {
+    return DebugUtil.validRef(ref);
+  }
 }

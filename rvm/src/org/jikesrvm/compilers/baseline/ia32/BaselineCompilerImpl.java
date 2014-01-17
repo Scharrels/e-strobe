@@ -555,8 +555,15 @@ public abstract class BaselineCompilerImpl extends BaselineCompiler implements B
     asm.emitPOP_Reg(T0); // T0 is array index
     asm.emitPOP_Reg(S0); // S0 is array ref
     genBoundsCheck(asm, T0, S0); // T0 is index, S0 is address of array
-    // push [S0+T0<<2]
-    asm.emitPUSH_RegIdx(S0, T0, Assembler.WORD, NO_SLOT);
+    if (isConcurrentCheck || NEEDS_INT_ALOAD_BARRIER) {
+      // rewind 2 args on stack
+      asm.emitPUSH_Reg(S0); // S0 is array ref
+      asm.emitPUSH_Reg(T0); // T0 is array index
+      Barriers.compileIntArrayLoadBarrier(asm, true);
+    } else {
+      // push [S0+T0<<2]
+      asm.emitPUSH_RegIdx(S0, T0, Assembler.WORD, NO_SLOT);
+    }
   }
 
   /**
@@ -564,8 +571,18 @@ public abstract class BaselineCompilerImpl extends BaselineCompiler implements B
    */
   @Override
   protected final void emit_faload() {
-    // identical to iaload
-    emit_iaload();
+    asm.emitPOP_Reg(T0); // T0 is array index
+    asm.emitPOP_Reg(S0); // S0 is array ref
+    genBoundsCheck(asm, T0, S0); // T0 is index, S0 is address of array
+    if (isConcurrentCheck || NEEDS_FLOAT_ALOAD_BARRIER) {
+      // rewind 2 args on stack
+      asm.emitPUSH_Reg(S0); // S0 is array ref
+      asm.emitPUSH_Reg(T0); // T0 is array index
+      Barriers.compileFloatArrayLoadBarrier(asm, true);
+    } else {
+      // push [S0+T0<<2]
+      asm.emitPUSH_RegIdx(S0, T0, Assembler.WORD, NO_SLOT);
+    }
   }
 
   /**
@@ -576,7 +593,7 @@ public abstract class BaselineCompilerImpl extends BaselineCompiler implements B
     asm.emitPOP_Reg(T0); // T0 is array index
     asm.emitPOP_Reg(T1); // T1 is array ref
     genBoundsCheck(asm, T0, T1); // T0 is index, T1 is address of array
-    if (NEEDS_OBJECT_ALOAD_BARRIER) {
+    if (isConcurrentCheck || NEEDS_OBJECT_ALOAD_BARRIER) {
       // rewind 2 args on stack
       asm.emitPUSH_Reg(T1); // T1 is array ref
       asm.emitPUSH_Reg(T0); // T0 is array index
@@ -594,13 +611,20 @@ public abstract class BaselineCompilerImpl extends BaselineCompiler implements B
     asm.emitPOP_Reg(T0); // T0 is array index
     asm.emitPOP_Reg(S0); // S0 is array ref
     genBoundsCheck(asm, T0, S0); // T0 is index, S0 is address of array
-    // T1 = (int)[S0+T0<<1]
-    if (VM.BuildFor32Addr) {
-      asm.emitMOVZX_Reg_RegIdx_Word(T1, S0, T0, Assembler.SHORT, NO_SLOT);
+    if (isConcurrentCheck || NEEDS_CHAR_ALOAD_BARRIER) {
+      // rewind 2 args on stack
+      asm.emitPUSH_Reg(S0); // S0 is array ref
+      asm.emitPUSH_Reg(T0); // T0 is array index
+      Barriers.compileCharArrayLoadBarrier(asm, true);
     } else {
-      asm.emitMOVZXQ_Reg_RegIdx_Word(T1, S0, T0, Assembler.SHORT, NO_SLOT);
+      // T1 = (int)[S0+T0<<1]
+      if (VM.BuildFor32Addr) {
+        asm.emitMOVZX_Reg_RegIdx_Word(T1, S0, T0, Assembler.SHORT, NO_SLOT);
+      } else {
+        asm.emitMOVZXQ_Reg_RegIdx_Word(T1, S0, T0, Assembler.SHORT, NO_SLOT);
+      }
+      asm.emitPUSH_Reg(T1);        // push short onto stack
     }
-    asm.emitPUSH_Reg(T1);        // push short onto stack
   }
 
   /**
@@ -611,13 +635,20 @@ public abstract class BaselineCompilerImpl extends BaselineCompiler implements B
     asm.emitPOP_Reg(T0); // T0 is array index
     asm.emitPOP_Reg(S0); // S0 is array ref
     genBoundsCheck(asm, T0, S0); // T0 is index, S0 is address of array
-    // T1 = (int)[S0+T0<<1]
-    if (VM.BuildFor32Addr) {
-      asm.emitMOVSX_Reg_RegIdx_Word(T1, S0, T0, Assembler.SHORT, NO_SLOT);
+    if (isConcurrentCheck || NEEDS_SHORT_ALOAD_BARRIER) {
+      // rewind 2 args on stack
+      asm.emitPUSH_Reg(S0); // S0 is array ref
+      asm.emitPUSH_Reg(T0); // T0 is array index
+      Barriers.compileShortArrayLoadBarrier(asm, true);
     } else {
-      asm.emitMOVSXQ_Reg_RegIdx_Word(T1, S0, T0, Assembler.SHORT, NO_SLOT);
+      // T1 = (int)[S0+T0<<1]
+      if (VM.BuildFor32Addr) {
+        asm.emitMOVSX_Reg_RegIdx_Word(T1, S0, T0, Assembler.SHORT, NO_SLOT);
+      } else {
+        asm.emitMOVSXQ_Reg_RegIdx_Word(T1, S0, T0, Assembler.SHORT, NO_SLOT);
+      }
+      asm.emitPUSH_Reg(T1);        // push short onto stack
     }
-    asm.emitPUSH_Reg(T1);        // push short onto stack
   }
 
   /**
@@ -628,13 +659,23 @@ public abstract class BaselineCompilerImpl extends BaselineCompiler implements B
     asm.emitPOP_Reg(T0); // T0 is array index
     asm.emitPOP_Reg(S0); // S0 is array ref
     genBoundsCheck(asm, T0, S0); // T0 is index, S0 is address of array
-    // T1 = (int)[S0+T0<<1]
-    if (VM.BuildFor32Addr) {
-      asm.emitMOVSX_Reg_RegIdx_Byte(T1, S0, T0, Assembler.BYTE, NO_SLOT);
+    /* We can't distinguish bytes from booleans here, so
+     * we're forced to have a single read barrier for both bytes
+     * and booleans.  */
+    if (isConcurrentCheck || NEEDS_BYTE_ALOAD_BARRIER || NEEDS_BOOLEAN_ALOAD_BARRIER) {
+      // rewind 2 args on stack
+      asm.emitPUSH_Reg(S0); // S0 is array ref
+      asm.emitPUSH_Reg(T0); // T0 is array index
+      Barriers.compileByteBooleanArrayLoadBarrier(asm, true);
     } else {
-      asm.emitMOVSXQ_Reg_RegIdx_Byte(T1, S0, T0, Assembler.BYTE, NO_SLOT);
+      // T1 = (int)[S0+T0<<1]
+      if (VM.BuildFor32Addr) {
+        asm.emitMOVSX_Reg_RegIdx_Byte(T1, S0, T0, Assembler.BYTE, NO_SLOT);
+      } else {
+        asm.emitMOVSXQ_Reg_RegIdx_Byte(T1, S0, T0, Assembler.BYTE, NO_SLOT);
+      }
+      asm.emitPUSH_Reg(T1);        // push byte onto stack
     }
-    asm.emitPUSH_Reg(T1);        // push byte onto stack
   }
 
   /**
@@ -648,17 +689,24 @@ public abstract class BaselineCompilerImpl extends BaselineCompiler implements B
       adjustStack(WORDSIZE*-2, true); // create space for result
     }
     genBoundsCheck(asm, T0, T1); // T0 is index, T1 is address of array
-    if (VM.BuildFor32Addr) {
-      if (SSE2_BASE) {
-        asm.emitMOVQ_Reg_RegIdx(XMM0, T1, T0, Assembler.LONG, NO_SLOT);
-        asm.emitMOVQ_RegInd_Reg(SP, XMM0);
-      } else {
-        asm.emitPUSH_RegIdx(T1, T0, Assembler.LONG, ONE_SLOT); // load high part of desired long array element
-        asm.emitPUSH_RegIdx(T1, T0, Assembler.LONG, NO_SLOT);  // load low part of desired long array element
-      }
+    if (isConcurrentCheck || NEEDS_LONG_ALOAD_BARRIER) {
+      // rewind 2 args on stack
+      asm.emitPUSH_Reg(T1); // T1 is array ref
+      asm.emitPUSH_Reg(T0); // T0 is array index
+      Barriers.compileLongArrayLoadBarrier(asm, true);
     } else {
-      adjustStack(-WORDSIZE, true);
-      asm.emitPUSH_RegIdx(T1, T0, Assembler.LONG, NO_SLOT);  // load desired long array element
+      if (VM.BuildFor32Addr) {
+        if (SSE2_BASE) {
+          asm.emitMOVQ_Reg_RegIdx(XMM0, T1, T0, Assembler.LONG, NO_SLOT);
+          asm.emitMOVQ_RegInd_Reg(SP, XMM0);
+        } else {
+          asm.emitPUSH_RegIdx(T1, T0, Assembler.LONG, ONE_SLOT); // load high part of desired long array element
+          asm.emitPUSH_RegIdx(T1, T0, Assembler.LONG, NO_SLOT);  // load low part of desired long array element
+        }
+      } else {
+        adjustStack(-WORDSIZE, true);
+        asm.emitPUSH_RegIdx(T1, T0, Assembler.LONG, NO_SLOT);  // load desired long array element
+      }
     }
   }
 
@@ -667,8 +715,31 @@ public abstract class BaselineCompilerImpl extends BaselineCompiler implements B
    */
   @Override
   protected final void emit_daload() {
-    // identical to laload
-    emit_laload();
+    asm.emitPOP_Reg(T0); // T0 is array index
+    asm.emitPOP_Reg(T1); // T1 is array ref
+    if (VM.BuildFor32Addr && SSE2_BASE) {
+      adjustStack(WORDSIZE*-2, true); // create space for result
+    }
+    genBoundsCheck(asm, T0, T1); // T0 is index, T1 is address of array
+    if (isConcurrentCheck || NEEDS_DOUBLE_ALOAD_BARRIER) {
+      // rewind 2 args on stack
+      asm.emitPUSH_Reg(T1); // T1 is array ref
+      asm.emitPUSH_Reg(T0); // T0 is array index
+      Barriers.compileDoubleArrayLoadBarrier(asm, true);
+    } else {
+      if (VM.BuildFor32Addr) {
+        if (SSE2_BASE) {
+          asm.emitMOVQ_Reg_RegIdx(XMM0, T1, T0, Assembler.LONG, NO_SLOT);
+          asm.emitMOVQ_RegInd_Reg(SP, XMM0);
+        } else {
+          asm.emitPUSH_RegIdx(T1, T0, Assembler.LONG, ONE_SLOT); // load high part of desired long array element
+          asm.emitPUSH_RegIdx(T1, T0, Assembler.LONG, NO_SLOT);  // load low part of desired long array element
+        }
+      } else {
+        adjustStack(-WORDSIZE, true);
+        asm.emitPUSH_RegIdx(T1, T0, Assembler.LONG, NO_SLOT);  // load desired long array element
+      }
+    }
   }
 
   /*
@@ -2786,43 +2857,126 @@ public abstract class BaselineCompilerImpl extends BaselineCompiler implements B
     emitDynamicLinkingSequence(asm, T0, fieldRef, true);
     if (fieldType.isReferenceType()) {
       // 32/64bit reference load
-      if (NEEDS_OBJECT_GETFIELD_BARRIER) {
+      if (isConcurrentCheck || NEEDS_OBJECT_GETFIELD_BARRIER) {
         Barriers.compileGetfieldBarrier(asm, T0, fieldRef.getId());
       } else {
         asm.emitPOP_Reg(S0);                                  // S0 is object reference
         asm.emitPUSH_RegIdx(S0, T0, Assembler.BYTE, NO_SLOT); // place field value on stack
       }
     } else if (fieldType.isBooleanType()) {
-      // 8bit unsigned load
-      asm.emitPOP_Reg(S0);                                                // S0 is object reference
-      asm.emitMOVZX_Reg_RegIdx_Byte(T1, S0, T0, Assembler.BYTE, NO_SLOT); // T1 is field value
-      asm.emitPUSH_Reg(T1);                                               // place value on stack
+      if (isConcurrentCheck || NEEDS_BOOLEAN_GETFIELD_BARRIER) {
+        Barriers.compileBooleanGetfieldBarrier(asm, T0, fieldRef.getId());
+      } else {
+        // 8bit unsigned load
+        asm.emitPOP_Reg(S0);                                                // S0 is object reference
+        asm.emitMOVZX_Reg_RegIdx_Byte(T1, S0, T0, Assembler.BYTE, NO_SLOT); // T1 is field value
+        asm.emitPUSH_Reg(T1);                                               // place value on stack
+      }
     } else if (fieldType.isByteType()) {
-      // 8bit signed load
-      asm.emitPOP_Reg(S0);                                                // S0 is object reference
-      asm.emitMOVSX_Reg_RegIdx_Byte(T1, S0, T0, Assembler.BYTE, NO_SLOT); // T1 is field value
-      asm.emitPUSH_Reg(T1);                                               // place value on stack
+      if (isConcurrentCheck || NEEDS_BYTE_GETFIELD_BARRIER) {
+        Barriers.compileByteGetfieldBarrier(asm, T0, fieldRef.getId());
+      } else {
+        // 8bit signed load
+        asm.emitPOP_Reg(S0);                                                // S0 is object reference
+        asm.emitMOVSX_Reg_RegIdx_Byte(T1, S0, T0, Assembler.BYTE, NO_SLOT); // T1 is field value
+        asm.emitPUSH_Reg(T1);                                               // place value on stack
+      }
     } else if (fieldType.isShortType()) {
-      // 16bit signed load
-      asm.emitPOP_Reg(S0);                                                // S0 is object reference
-      asm.emitMOVSX_Reg_RegIdx_Word(T1, S0, T0, Assembler.BYTE, NO_SLOT); // T1 is field value
-      asm.emitPUSH_Reg(T1);                                               // place value on stack
+      if (isConcurrentCheck || NEEDS_SHORT_GETFIELD_BARRIER) {
+        Barriers.compileShortGetfieldBarrier(asm, T0, fieldRef.getId());
+      } else {
+        // 16bit signed load
+        asm.emitPOP_Reg(S0);                                                // S0 is object reference
+        asm.emitMOVSX_Reg_RegIdx_Word(T1, S0, T0, Assembler.BYTE, NO_SLOT); // T1 is field value
+        asm.emitPUSH_Reg(T1);                                               // place value on stack
+      }
     } else if (fieldType.isCharType()) {
-      // 16bit unsigned load
-      asm.emitPOP_Reg(S0);                                                // S0 is object reference
-      asm.emitMOVZX_Reg_RegIdx_Word(T1, S0, T0, Assembler.BYTE, NO_SLOT); // T1 is field value
-      asm.emitPUSH_Reg(T1);                                               // place value on stack
-    } else if (fieldType.isIntType() || fieldType.isFloatType() ||
-               (VM.BuildFor32Addr && fieldType.isWordLikeType())) {
+      if (isConcurrentCheck || NEEDS_CHAR_GETFIELD_BARRIER) {
+        Barriers.compileCharGetfieldBarrier(asm, T0, fieldRef.getId());
+      } else {
+        // 16bit unsigned load
+        asm.emitPOP_Reg(S0);                                                // S0 is object reference
+        asm.emitMOVZX_Reg_RegIdx_Word(T1, S0, T0, Assembler.BYTE, NO_SLOT); // T1 is field value
+        asm.emitPUSH_Reg(T1);                                               // place value on stack
+      }
+    } else if (fieldType.isIntType()) {
+      if (isConcurrentCheck || NEEDS_INT_GETFIELD_BARRIER) {
+        Barriers.compileIntGetfieldBarrier(asm, T0, fieldRef.getId());
+      } else {
+        // 32bit load
+        asm.emitPOP_Reg(S0);                                  // S0 is object reference
+        asm.emitPUSH_RegIdx(S0, T0, Assembler.BYTE, NO_SLOT); // place field value on stack
+      }
+    } else if (fieldType.isFloatType()) {
+      if (isConcurrentCheck || NEEDS_FLOAT_GETFIELD_BARRIER) {
+        Barriers.compileFloatGetfieldBarrier(asm, T0, fieldRef.getId());
+      } else {
+
+        // 32bit load
+        asm.emitPOP_Reg(S0);                                  // S0 is object reference
+        asm.emitPUSH_RegIdx(S0, T0, Assembler.BYTE, NO_SLOT); // place field value on stack
+      }
+    } else if (VM.BuildFor32Addr && fieldType.isWordLikeType()) {
+      /**
+       * TODO: for completeness we should implement read barriers for wordlike
+       * types: Word, Offset, Address, and Extent.  For now we will skip these.
+       */
+
       // 32bit load
       asm.emitPOP_Reg(S0);                                  // S0 is object reference
       asm.emitPUSH_RegIdx(S0, T0, Assembler.BYTE, NO_SLOT); // place field value on stack
-    } else {
-      // 64bit load
-      if (VM.VerifyAssertions) {
-        VM._assert(fieldType.isLongType() || fieldType.isDoubleType() ||
-                   (VM.BuildFor64Addr && fieldType.isWordLikeType()));
+    } else if (fieldType.isLongType()) {
+      if (isConcurrentCheck || NEEDS_LONG_GETFIELD_BARRIER) {
+        Barriers.compileLongGetfieldBarrier(asm, T0, fieldRef.getId());
+      } else {
+        asm.emitPOP_Reg(T1);           // T1 is object reference
+        if (VM.BuildFor32Addr) {
+          // NB this is a 64bit copy from memory to the stack so implement
+          // as a slightly optimized Intel memory copy using the FPU
+          adjustStack(-2*WORDSIZE, true); // adjust stack down to hold 64bit value
+          if (SSE2_BASE) {
+            asm.emitMOVQ_Reg_RegIdx(XMM0, T1, T0, Assembler.BYTE, NO_SLOT); // XMM0 is field value
+            asm.emitMOVQ_RegInd_Reg(SP, XMM0); // place value on stack
+          } else {
+            asm.emitFLD_Reg_RegIdx_Quad(FP0, T1, T0, Assembler.BYTE, NO_SLOT); // FP0 is field value
+            asm.emitFSTP_RegInd_Reg_Quad(SP, FP0); // place value on stack
+          }
+        } else {
+          if (!fieldType.isWordLikeType()) {
+            adjustStack(-WORDSIZE, true); // add empty slot
+          }
+          asm.emitPUSH_RegIdx(T1, T0, Assembler.BYTE, NO_SLOT); // place value on stack
+        }
       }
+    } else if (fieldType.isDoubleType()) {
+      if (isConcurrentCheck || NEEDS_DOUBLE_GETFIELD_BARRIER) {
+        Barriers.compileDoubleGetfieldBarrier(asm, T0, fieldRef.getId());
+      } else {
+        asm.emitPOP_Reg(T1);           // T1 is object reference
+        if (VM.BuildFor32Addr) {
+          // NB this is a 64bit copy from memory to the stack so implement
+          // as a slightly optimized Intel memory copy using the FPU
+          adjustStack(-2*WORDSIZE, true); // adjust stack down to hold 64bit value
+          if (SSE2_BASE) {
+            asm.emitMOVQ_Reg_RegIdx(XMM0, T1, T0, Assembler.BYTE, NO_SLOT); // XMM0 is field value
+            asm.emitMOVQ_RegInd_Reg(SP, XMM0); // place value on stack
+          } else {
+            asm.emitFLD_Reg_RegIdx_Quad(FP0, T1, T0, Assembler.BYTE, NO_SLOT); // FP0 is field value
+            asm.emitFSTP_RegInd_Reg_Quad(SP, FP0); // place value on stack
+          }
+        } else {
+          if (!fieldType.isWordLikeType()) {
+            adjustStack(-WORDSIZE, true); // add empty slot
+          }
+          asm.emitPUSH_RegIdx(T1, T0, Assembler.BYTE, NO_SLOT); // place value on stack
+        }
+      }
+    } else if ((VM.BuildFor64Addr && fieldType.isWordLikeType())) {
+      /**
+       * TODO: for completeness we should implement read barriers for wordlike
+       * types: Word, Offset, Address, and Extent.  For now we will skip these.
+       */
+
       asm.emitPOP_Reg(T1);           // T1 is object reference
       if (VM.BuildFor32Addr) {
         // NB this is a 64bit copy from memory to the stack so implement
@@ -2855,44 +3009,118 @@ public abstract class BaselineCompilerImpl extends BaselineCompiler implements B
     Offset fieldOffset = field.getOffset();
     if (field.isReferenceType()) {
       // 32/64bit reference load
-      if (NEEDS_OBJECT_GETFIELD_BARRIER && !field.isUntraced()) {
+      if ((isConcurrentCheck || NEEDS_OBJECT_GETFIELD_BARRIER) && !field.isUntraced()) {
         Barriers.compileGetfieldBarrierImm(asm, fieldOffset, fieldRef.getId());
       } else {
         asm.emitPOP_Reg(T0);                   // T0 is object reference
         asm.emitPUSH_RegDisp(T0, fieldOffset); // place field value on stack
       }
     } else if (fieldType.isBooleanType()) {
-      // 8bit unsigned load
-      asm.emitPOP_Reg(S0);                                 // S0 is object reference
-      asm.emitMOVZX_Reg_RegDisp_Byte(T0, S0, fieldOffset); // T0 is field value
-      asm.emitPUSH_Reg(T0);                                // place value on stack
+      if (isConcurrentCheck || NEEDS_BOOLEAN_GETFIELD_BARRIER) {
+        Barriers.compileBooleanGetfieldBarrierImm(asm, fieldOffset, fieldRef.getId());
+      } else {
+        // 8bit unsigned load
+        asm.emitPOP_Reg(S0);                                 // S0 is object reference
+        asm.emitMOVZX_Reg_RegDisp_Byte(T0, S0, fieldOffset); // T0 is field value
+        asm.emitPUSH_Reg(T0);                                // place value on stack
+      }
     } else if (fieldType.isByteType()) {
-      // 8bit signed load
-      asm.emitPOP_Reg(S0);                                 // S0 is object reference
-      asm.emitMOVSX_Reg_RegDisp_Byte(T0, S0, fieldOffset); // T0 is field value
-      asm.emitPUSH_Reg(T0);                                // place value on stack
+      if (isConcurrentCheck || NEEDS_BYTE_GETFIELD_BARRIER) {
+        Barriers.compileByteGetfieldBarrierImm(asm, fieldOffset, fieldRef.getId());
+      } else {
+        // 8bit signed load
+        asm.emitPOP_Reg(S0);                                 // S0 is object reference
+        asm.emitMOVSX_Reg_RegDisp_Byte(T0, S0, fieldOffset); // T0 is field value
+        asm.emitPUSH_Reg(T0);                                // place value on stack
+      }
     } else if (fieldType.isShortType()) {
-      // 16bit signed load
-      asm.emitPOP_Reg(S0);                                 // S0 is object reference
-      asm.emitMOVSX_Reg_RegDisp_Word(T0, S0, fieldOffset); // T0 is field value
-      asm.emitPUSH_Reg(T0);                                // place value on stack
+      if (isConcurrentCheck || NEEDS_SHORT_GETFIELD_BARRIER) {
+        Barriers.compileShortGetfieldBarrierImm(asm, fieldOffset, fieldRef.getId());
+      } else {
+        // 16bit signed load
+        asm.emitPOP_Reg(S0);                                 // S0 is object reference
+        asm.emitMOVSX_Reg_RegDisp_Word(T0, S0, fieldOffset); // T0 is field value
+        asm.emitPUSH_Reg(T0);                                // place value on stack
+      }
     } else if (fieldType.isCharType()) {
-      // 16bit unsigned load
-      asm.emitPOP_Reg(S0);                                 // S0 is object reference
-      asm.emitMOVZX_Reg_RegDisp_Word(T0, S0, fieldOffset); // T0 is field value
-      asm.emitPUSH_Reg(T0);                                // place value on stack
-    } else if (fieldType.isIntType() || fieldType.isFloatType() ||
-               (VM.BuildFor32Addr && fieldType.isWordLikeType())) {
+      if (isConcurrentCheck || NEEDS_CHAR_GETFIELD_BARRIER) {
+        Barriers.compileCharGetfieldBarrierImm(asm, fieldOffset, fieldRef.getId());
+      } else {
+        // 16bit unsigned load
+        asm.emitPOP_Reg(S0);                                 // S0 is object reference
+        asm.emitMOVZX_Reg_RegDisp_Word(T0, S0, fieldOffset); // T0 is field value
+        asm.emitPUSH_Reg(T0);                                // place value on stack
+      }
+    } else if (fieldType.isIntType()) {
+      if (isConcurrentCheck || NEEDS_INT_GETFIELD_BARRIER) {
+        Barriers.compileIntGetfieldBarrierImm(asm, fieldOffset, fieldRef.getId());
+      } else {
+        // 32bit load
+        asm.emitPOP_Reg(S0);                          // S0 is object reference
+        asm.emitMOV_Reg_RegDisp(T0, S0, fieldOffset); // T0 is field value
+        asm.emitPUSH_Reg(T0);                         // place value on stack
+      }
+    } else if (fieldType.isFloatType()) {
+      if (isConcurrentCheck || NEEDS_FLOAT_GETFIELD_BARRIER) {
+        Barriers.compileFloatGetfieldBarrierImm(asm, fieldOffset, fieldRef.getId());
+      } else {
+        // 32bit load
+        asm.emitPOP_Reg(S0);                          // S0 is object reference
+        asm.emitMOV_Reg_RegDisp(T0, S0, fieldOffset); // T0 is field value
+        asm.emitPUSH_Reg(T0);                         // place value on stack
+      }
+    } else if (VM.BuildFor32Addr && fieldType.isWordLikeType()) {
+      /**
+       * TODO: for completeness we should implement read barriers for wordlike
+       * types: Word, Offset, Address, and Extent.  For now we will skip these.
+       */
+      
       // 32bit load
       asm.emitPOP_Reg(S0);                          // S0 is object reference
       asm.emitMOV_Reg_RegDisp(T0, S0, fieldOffset); // T0 is field value
       asm.emitPUSH_Reg(T0);                         // place value on stack
-    } else {
-      // 64bit load
-      if (VM.VerifyAssertions) {
-        VM._assert(fieldType.isLongType() || fieldType.isDoubleType() ||
-                   (VM.BuildFor64Addr && fieldType.isWordLikeType()));
+    } else if (fieldType.isLongType()) {
+      if (isConcurrentCheck || NEEDS_LONG_GETFIELD_BARRIER) {
+        Barriers.compileLongGetfieldBarrierImm(asm, fieldOffset, fieldRef.getId());
+      } else {
+        asm.emitPOP_Reg(T0); // T0 is object reference
+        if (VM.BuildFor32Addr) {
+          // NB this is a 64bit copy from memory to the stack so implement
+          // as a slightly optimized Intel memory copy using the FPU
+          adjustStack(-2*WORDSIZE, true); // adjust stack down to hold 64bit value
+          if (SSE2_BASE) {
+            asm.emitMOVQ_Reg_RegDisp(XMM0, T0, fieldOffset); // XMM0 is field value
+            asm.emitMOVQ_RegInd_Reg(SP, XMM0); // replace reference with value on stack
+          } else {
+            asm.emitFLD_Reg_RegDisp_Quad(FP0, T0, fieldOffset); // FP0 is field value
+            asm.emitFSTP_RegInd_Reg_Quad(SP, FP0); // replace reference with value on stack
+          }
+        }
       }
+    } else if (fieldType.isDoubleType()) {
+      if (isConcurrentCheck || NEEDS_DOUBLE_GETFIELD_BARRIER) {
+        Barriers.compileDoubleGetfieldBarrierImm(asm, fieldOffset, fieldRef.getId());
+      } else {
+        asm.emitPOP_Reg(T0); // T0 is object reference
+        if (VM.BuildFor32Addr) {
+          // NB this is a 64bit copy from memory to the stack so implement
+          // as a slightly optimized Intel memory copy using the FPU
+          adjustStack(-2*WORDSIZE, true); // adjust stack down to hold 64bit value
+          if (SSE2_BASE) {
+            asm.emitMOVQ_Reg_RegDisp(XMM0, T0, fieldOffset); // XMM0 is field value
+            asm.emitMOVQ_RegInd_Reg(SP, XMM0); // replace reference with value on stack
+          } else {
+            asm.emitFLD_Reg_RegDisp_Quad(FP0, T0, fieldOffset); // FP0 is field value
+            asm.emitFSTP_RegInd_Reg_Quad(SP, FP0); // replace reference with value on stack
+          }
+        }
+      }
+    } else if (VM.BuildFor64Addr && fieldType.isWordLikeType()) {
+      /**
+       * TODO: for completeness we should implement read barriers for wordlike
+       * types: Word, Offset, Address, and Extent.  For now we will skip these.
+       */
+      
       asm.emitPOP_Reg(T0); // T0 is object reference
       if (VM.BuildFor32Addr) {
         // NB this is a 64bit copy from memory to the stack so implement
@@ -3910,7 +4138,7 @@ public abstract class BaselineCompilerImpl extends BaselineCompiler implements B
 
       if (!VM.runningTool && ((BaselineCompiledMethod) compiledMethod).hasCounterArray()) {
         // use (nonvolatile) EBX to hold base of this method's counter array
-        if (NEEDS_OBJECT_ALOAD_BARRIER) {
+        if (isConcurrentCheck || NEEDS_OBJECT_ALOAD_BARRIER) {
           asm.emitPUSH_Abs(Magic.getTocPointer().plus(Entrypoints.edgeCountersField.getOffset()));
           asm.emitPUSH_Imm(getEdgeCounterIndex());
           Barriers.compileArrayLoadBarrier(asm, false);

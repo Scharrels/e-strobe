@@ -16,6 +16,7 @@ import org.mmtk.plan.Plan;
 import org.mmtk.utility.Constants;
 
 import org.mmtk.vm.VM;
+import org.mmtk.utility.Log;
 
 import org.vmmagic.unboxed.*;
 import org.vmmagic.pragma.*;

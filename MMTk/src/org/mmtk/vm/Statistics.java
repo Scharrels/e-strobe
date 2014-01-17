@@ -65,4 +65,19 @@ public abstract class Statistics {
    * Read a performance event value
    */
   public abstract void perfEventRead(int counter, long[] values);
+
+  /**
+   * Strobe: Get number of active checking threads
+   */
+  public abstract int getNumCheckers();
+
+  /**
+   * Strobe: Wait for all checkers to finish
+   */
+  public abstract void waitAllCheckersDone();
+
+  /**
+   * Strobe: stop the adpative compiler
+   */
+  public abstract void stopAdaptiveCompiler();
 }

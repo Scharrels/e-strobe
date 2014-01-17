@@ -12,6 +12,7 @@
  */
 package org.mmtk.vm;
 
+import org.mmtk.plan.TraceLocal;
 import org.vmmagic.pragma.Uninterruptible;
 import org.vmmagic.unboxed.*;
 
@@ -233,7 +234,15 @@ import org.vmmagic.unboxed.*;
    * @param object The object whose information is to be dumped
    */
   public abstract void dumpObject(ObjectReference object);
-
+  
+  /**
+   * Trace forwarding word in object header
+   * 
+   * @param object The object whose forwarding word to trace
+   * @param trace The trace to use
+   */
+  public abstract void traceForwardingWord(ObjectReference object, TraceLocal trace);
+  
   /*
    * NOTE: The following methods must be implemented by subclasses of this
    * class, but are internal to the VM<->MM interface glue, so are never
@@ -253,4 +262,5 @@ import org.vmmagic.unboxed.*;
   static Offset arrayBaseOffsetTrapdoor(ObjectModel o) {
     return o.getArrayBaseOffset();
   }
+ 
 }

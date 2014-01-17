@@ -763,4 +763,12 @@ public class Statics implements Constants {
   public static void bootImageReportGeneration(Object slots) {
     objectSlots = (Object[])slots;
   }
+
+  /**
+   * Get address of a static
+   */
+  public static Address getSlotAddress(Offset offset)
+  {
+    return Magic.objectAsAddress(slots).plus(middleOfTable << LOG_BYTES_IN_INT);
+  }
 }

@@ -12,8 +12,10 @@
  */
 package org.jikesrvm.mm.mminterface;
 
+import org.jikesrvm.objectmodel.MiscHeader;
 import org.jikesrvm.runtime.Magic;
 import org.jikesrvm.runtime.Memory;
+import org.jikesrvm.scheduler.RVMThread;
 import org.jikesrvm.VM;
 import org.vmmagic.pragma.Entrypoint;
 import org.vmmagic.pragma.Inline;
@@ -112,12 +114,13 @@ public class Barriers implements org.mmtk.utility.Constants {
   @Inline
   @Entrypoint
   public static boolean booleanFieldRead(Object ref, Offset offset, int locationMetadata) {
+    ObjectReference src = ObjectReference.fromObject(ref);
     if (NEEDS_BOOLEAN_GC_READ_BARRIER) {
-      ObjectReference src = ObjectReference.fromObject(ref);
       return Selected.Mutator.get().booleanRead(src, src.toAddress().plus(offset), offset.toWord(), Word.fromIntZeroExtend(locationMetadata), INSTANCE_FIELD);
-    } else if (VM.VerifyAssertions)
-      VM._assert(false);
-    return false;
+    } else {
+      Object forwardedRef = CHAInterface.getSnapshot(src);
+      return Magic.getByteAtOffset(forwardedRef, offset) == 0;
+    }
   }
 
   /**
@@ -127,6 +130,8 @@ public class Barriers implements org.mmtk.utility.Constants {
    * @param index the index into the array were the reference resides.
    * @return the value read from the array
    */
+  /* TODO: We conflate byte and boolean array loads because we can't 
+   * distinguish between the two in the baload bytecode.
   @Inline
   @Entrypoint
   public static boolean booleanArrayRead(boolean[] ref, int index) {
@@ -137,7 +142,7 @@ public class Barriers implements org.mmtk.utility.Constants {
     } else if (VM.VerifyAssertions)
       VM._assert(false);
     return false;
-  }
+  } */
 
   /**
    * Barrier for a bulk copy of booleans (i.e. in an array copy).
@@ -221,16 +226,18 @@ public class Barriers implements org.mmtk.utility.Constants {
   @Inline
   @Entrypoint
   public static byte byteFieldRead(Object ref, Offset offset, int locationMetadata) {
+    ObjectReference src = ObjectReference.fromObject(ref);
     if (NEEDS_BYTE_GC_READ_BARRIER) {
-      ObjectReference src = ObjectReference.fromObject(ref);
       return Selected.Mutator.get().byteRead(src, src.toAddress().plus(offset), offset.toWord(), Word.fromIntZeroExtend(locationMetadata), INSTANCE_FIELD);
-    } else if (VM.VerifyAssertions)
-      VM._assert(false);
-    return 0;
+    } else {
+      Object forwardedRef = CHAInterface.getSnapshot(src);
+      return Magic.getByteAtOffset(forwardedRef, offset);
+    }
   }
 
   /**
-   * Barrier for loads of bytes from fields of arrays (ie baload).
+   * Barrier for loads of bytes or booleans from fields of arrays 
+   * (ie baload).
    *
    * @param ref the array containing the reference.
    * @param index the index into the array were the reference resides.
@@ -238,14 +245,15 @@ public class Barriers implements org.mmtk.utility.Constants {
    */
   @Inline
   @Entrypoint
-  public static byte byteArrayRead(byte[] ref, int index) {
-    if (NEEDS_BYTE_GC_READ_BARRIER) {
-      ObjectReference array = ObjectReference.fromObject(ref);
-      Offset offset = Offset.fromIntZeroExtend(index);
+  public static byte byteBooleanArrayRead(byte[] ref, int index) {    
+    ObjectReference array = ObjectReference.fromObject(ref);
+    Offset offset = Offset.fromIntZeroExtend(index);
+    if (NEEDS_BYTE_GC_READ_BARRIER || NEEDS_BOOLEAN_GC_READ_BARRIER) {
       return Selected.Mutator.get().byteRead(array, array.toAddress().plus(offset), offset.toWord(), Word.zero(), ARRAY_ELEMENT);
-    } else if (VM.VerifyAssertions)
-      VM._assert(false);
-    return 0;
+    } else {
+      Object forwardedRef = CHAInterface.getSnapshot(array);
+      return Magic.getByteAtOffset(forwardedRef, offset);
+    }
   }
 
   /**
@@ -331,12 +339,13 @@ public class Barriers implements org.mmtk.utility.Constants {
   @Inline
   @Entrypoint
   public static char charFieldRead(Object ref, Offset offset, int locationMetadata) {
+    ObjectReference src = ObjectReference.fromObject(ref);
     if (NEEDS_CHAR_GC_READ_BARRIER) {
-      ObjectReference src = ObjectReference.fromObject(ref);
       return Selected.Mutator.get().charRead(src, src.toAddress().plus(offset), offset.toWord(), Word.fromIntZeroExtend(locationMetadata), INSTANCE_FIELD);
-    } else if (VM.VerifyAssertions)
-      VM._assert(false);
-    return 0;
+    } else {
+      Object forwardedRef = CHAInterface.getSnapshot(src);
+      return Magic.getCharAtOffset(forwardedRef, offset);
+    }
   }
 
   /**
@@ -349,13 +358,14 @@ public class Barriers implements org.mmtk.utility.Constants {
   @Inline
   @Entrypoint
   public static char charArrayRead(char[] ref, int index) {
+    ObjectReference array = ObjectReference.fromObject(ref);
+    Offset offset = Offset.fromIntZeroExtend(index << MemoryManagerConstants.LOG_BYTES_IN_CHAR);
     if (NEEDS_CHAR_GC_READ_BARRIER) {
-      ObjectReference array = ObjectReference.fromObject(ref);
-      Offset offset = Offset.fromIntZeroExtend(index << MemoryManagerConstants.LOG_BYTES_IN_CHAR);
       return Selected.Mutator.get().charRead(array, array.toAddress().plus(offset), offset.toWord(), Word.zero(), ARRAY_ELEMENT);
-    } else if (VM.VerifyAssertions)
-      VM._assert(false);
-    return 0;
+    } else {
+      Object forwardedRef = CHAInterface.getSnapshot(array);
+      return Magic.getCharAtOffset(forwardedRef, offset);
+    }
   }
 
   /**
@@ -441,12 +451,13 @@ public class Barriers implements org.mmtk.utility.Constants {
   @Inline
   @Entrypoint
   public static short shortFieldRead(Object ref, Offset offset, int locationMetadata) {
+    ObjectReference src = ObjectReference.fromObject(ref);
     if (NEEDS_SHORT_GC_READ_BARRIER) {
-      ObjectReference src = ObjectReference.fromObject(ref);
       return Selected.Mutator.get().shortRead(src, src.toAddress().plus(offset), offset.toWord(), Word.fromIntZeroExtend(locationMetadata), INSTANCE_FIELD);
-    } else if (VM.VerifyAssertions)
-      VM._assert(false);
-    return 0;
+    } else {
+      Object forwardedRef = CHAInterface.getSnapshot(src);
+      return Magic.getShortAtOffset(forwardedRef, offset);
+    }
   }
 
   /**
@@ -459,13 +470,14 @@ public class Barriers implements org.mmtk.utility.Constants {
   @Inline
   @Entrypoint
   public static short shortArrayRead(short[] ref, int index) {
+    ObjectReference array = ObjectReference.fromObject(ref);
+    Offset offset = Offset.fromIntZeroExtend(index << MemoryManagerConstants.LOG_BYTES_IN_SHORT);
     if (NEEDS_SHORT_GC_READ_BARRIER) {
-      ObjectReference array = ObjectReference.fromObject(ref);
-      Offset offset = Offset.fromIntZeroExtend(index << MemoryManagerConstants.LOG_BYTES_IN_SHORT);
       return Selected.Mutator.get().shortRead(array, array.toAddress().plus(offset), offset.toWord(), Word.zero(), ARRAY_ELEMENT);
-    } else if (VM.VerifyAssertions)
-      VM._assert(false);
-    return 0;
+    } else {
+      Object forwardedRef = CHAInterface.getSnapshot(array);
+      return Magic.getShortAtOffset(forwardedRef, offset);
+    }
   }
 
   /**
@@ -552,12 +564,13 @@ public class Barriers implements org.mmtk.utility.Constants {
   @Inline
   @Entrypoint
   public static int intFieldRead(Object ref, Offset offset, int locationMetadata) {
+    ObjectReference src = ObjectReference.fromObject(ref);
     if (NEEDS_INT_GC_READ_BARRIER) {
-      ObjectReference src = ObjectReference.fromObject(ref);
       return Selected.Mutator.get().intRead(src, src.toAddress().plus(offset), offset.toWord(), Word.fromIntZeroExtend(locationMetadata), INSTANCE_FIELD);
-    } else if (VM.VerifyAssertions)
-      VM._assert(false);
-    return 0;
+    } else {
+      Object forwardedRef = CHAInterface.getSnapshot(src);
+      return Magic.getIntAtOffset(forwardedRef, offset);
+    }
   }
 
   /**
@@ -570,13 +583,14 @@ public class Barriers implements org.mmtk.utility.Constants {
   @Inline
   @Entrypoint
   public static int intArrayRead(int[] ref, int index) {
+    ObjectReference array = ObjectReference.fromObject(ref);
+    Offset offset = Offset.fromIntZeroExtend(index << MemoryManagerConstants.LOG_BYTES_IN_INT);
     if (NEEDS_INT_GC_READ_BARRIER) {
-      ObjectReference array = ObjectReference.fromObject(ref);
-      Offset offset = Offset.fromIntZeroExtend(index << MemoryManagerConstants.LOG_BYTES_IN_INT);
       return Selected.Mutator.get().intRead(array, array.toAddress().plus(offset), offset.toWord(), Word.zero(), ARRAY_ELEMENT);
-    } else if (VM.VerifyAssertions)
-      VM._assert(false);
-    return 0;
+    } else {
+      Object forwardedRef = CHAInterface.getSnapshot(array);
+      return Magic.getIntAtOffset(forwardedRef, offset);
+    }
   }
 
   /**
@@ -681,12 +695,13 @@ public class Barriers implements org.mmtk.utility.Constants {
   @Inline
   @Entrypoint
   public static long longFieldRead(Object ref, Offset offset, int locationMetadata) {
+    ObjectReference src = ObjectReference.fromObject(ref);
     if (NEEDS_LONG_GC_READ_BARRIER) {
-      ObjectReference src = ObjectReference.fromObject(ref);
       return Selected.Mutator.get().longRead(src, src.toAddress().plus(offset), offset.toWord(), Word.fromIntZeroExtend(locationMetadata), INSTANCE_FIELD);
-    } else if (VM.VerifyAssertions)
-      VM._assert(false);
-    return 0;
+    } else {
+      Object forwardedRef = CHAInterface.getSnapshot(src);
+      return Magic.getLongAtOffset(forwardedRef, offset);
+    }
   }
 
   /**
@@ -699,13 +714,14 @@ public class Barriers implements org.mmtk.utility.Constants {
   @Inline
   @Entrypoint
   public static long longArrayRead(long[] ref, int index) {
+    ObjectReference array = ObjectReference.fromObject(ref);
+    Offset offset = Offset.fromIntZeroExtend(index << MemoryManagerConstants.LOG_BYTES_IN_LONG);
     if (NEEDS_LONG_GC_READ_BARRIER) {
-      ObjectReference array = ObjectReference.fromObject(ref);
-      Offset offset = Offset.fromIntZeroExtend(index << MemoryManagerConstants.LOG_BYTES_IN_LONG);
       return Selected.Mutator.get().longRead(array, array.toAddress().plus(offset), offset.toWord(), Word.zero(), ARRAY_ELEMENT);
-    } else if (VM.VerifyAssertions)
-      VM._assert(false);
-    return 0;
+    } else {
+      Object forwardedRef = CHAInterface.getSnapshot(array);
+      return Magic.getLongAtOffset(forwardedRef, offset);
+    }
   }
 
   /**
@@ -809,12 +825,13 @@ public class Barriers implements org.mmtk.utility.Constants {
   @Inline
   @Entrypoint
   public static float floatFieldRead(Object ref, Offset offset, int locationMetadata) {
+    ObjectReference src = ObjectReference.fromObject(ref);
     if (NEEDS_FLOAT_GC_READ_BARRIER) {
-      ObjectReference src = ObjectReference.fromObject(ref);
       return Selected.Mutator.get().floatRead(src, src.toAddress().plus(offset), offset.toWord(), Word.fromIntZeroExtend(locationMetadata), INSTANCE_FIELD);
-    } else if (VM.VerifyAssertions)
-      VM._assert(false);
-    return 0;
+    } else {
+      Object forwardedRef = CHAInterface.getSnapshot(src);
+      return Magic.getFloatAtOffset(forwardedRef, offset);
+    }
   }
 
   /**
@@ -827,13 +844,14 @@ public class Barriers implements org.mmtk.utility.Constants {
   @Inline
   @Entrypoint
   public static float floatArrayRead(float[] ref, int index) {
+    ObjectReference array = ObjectReference.fromObject(ref);
+    Offset offset = Offset.fromIntZeroExtend(index << MemoryManagerConstants.LOG_BYTES_IN_FLOAT);
     if (NEEDS_FLOAT_GC_READ_BARRIER) {
-      ObjectReference array = ObjectReference.fromObject(ref);
-      Offset offset = Offset.fromIntZeroExtend(index << MemoryManagerConstants.LOG_BYTES_IN_FLOAT);
       return Selected.Mutator.get().floatRead(array, array.toAddress().plus(offset), offset.toWord(), Word.zero(), ARRAY_ELEMENT);
-    } else if (VM.VerifyAssertions)
-      VM._assert(false);
-    return 0;
+    } else {
+      Object forwardedRef = CHAInterface.getSnapshot(array);
+      return Magic.getFloatAtOffset(forwardedRef, offset);
+    }
   }
 
   /**
@@ -919,12 +937,13 @@ public class Barriers implements org.mmtk.utility.Constants {
   @Inline
   @Entrypoint
   public static double doubleFieldRead(Object ref, Offset offset, int locationMetadata) {
+    ObjectReference src = ObjectReference.fromObject(ref);
     if (NEEDS_DOUBLE_GC_READ_BARRIER) {
-      ObjectReference src = ObjectReference.fromObject(ref);
       return Selected.Mutator.get().doubleRead(src, src.toAddress().plus(offset), offset.toWord(), Word.fromIntZeroExtend(locationMetadata), INSTANCE_FIELD);
-    } else if (VM.VerifyAssertions)
-      VM._assert(false);
-    return 0;
+    } else {
+      Object forwardedRef = CHAInterface.getSnapshot(src);
+      return Magic.getDoubleAtOffset(forwardedRef, offset);
+    }
   }
 
   /**
@@ -937,13 +956,14 @@ public class Barriers implements org.mmtk.utility.Constants {
   @Inline
   @Entrypoint
   public static double doubleArrayRead(double[] ref, int index) {
+    ObjectReference array = ObjectReference.fromObject(ref);
+    Offset offset = Offset.fromIntZeroExtend(index << MemoryManagerConstants.LOG_BYTES_IN_DOUBLE);
     if (NEEDS_DOUBLE_GC_READ_BARRIER) {
-      ObjectReference array = ObjectReference.fromObject(ref);
-      Offset offset = Offset.fromIntZeroExtend(index << MemoryManagerConstants.LOG_BYTES_IN_DOUBLE);
       return Selected.Mutator.get().doubleRead(array, array.toAddress().plus(offset), offset.toWord(), Word.zero(), ARRAY_ELEMENT);
-    } else if (VM.VerifyAssertions)
-      VM._assert(false);
-    return 0;
+    } else {
+      Object forwardedRef = CHAInterface.getSnapshot(array);
+      return Magic.getDoubleAtOffset(forwardedRef, offset);
+    }
   }
 
   /**
@@ -1199,11 +1219,11 @@ public class Barriers implements org.mmtk.utility.Constants {
   }
 
   /** True if the garbage collector requires write barriers on reference putfield, arraystore or modifycheck */
-  private static final boolean NEEDS_OBJECT_GC_WRITE_BARRIER     = Selected.Constraints.get().needsObjectReferenceWriteBarrier();
+  public static final boolean NEEDS_OBJECT_GC_WRITE_BARRIER     = Selected.Constraints.get().needsObjectReferenceWriteBarrier();
   /** True if the VM requires write barriers on reference putfield */
-  public static final boolean  NEEDS_OBJECT_PUTFIELD_BARRIER     = NEEDS_OBJECT_GC_WRITE_BARRIER;
+  public static final boolean  NEEDS_OBJECT_PUTFIELD_BARRIER     = true;
   /** True if the VM requires write barriers on reference arraystore */
-  public static final boolean  NEEDS_OBJECT_ASTORE_BARRIER       = NEEDS_OBJECT_GC_WRITE_BARRIER;
+  public static final boolean  NEEDS_OBJECT_ASTORE_BARRIER       = true;
   /** True if the garbage collector requires read barriers on reference getfield or arrayload */
   private static final boolean NEEDS_OBJECT_GC_READ_BARRIER      = Selected.Constraints.get().needsObjectReferenceReadBarrier();
   /** True if the VM requires read barriers on reference getfield */
@@ -1224,11 +1244,17 @@ public class Barriers implements org.mmtk.utility.Constants {
   @Inline
   @Entrypoint
   public static void objectFieldWrite(Object ref, Object value, Offset offset, int locationMetadata) {
+    ObjectReference src = ObjectReference.fromObject(ref);
+    // snapshot object
+    if ( ! CHAInterface.noWriteBarrier)
+      RVMThread.getCurrentThread().chaSnapshot(src);
     if (NEEDS_OBJECT_GC_WRITE_BARRIER) {
-      ObjectReference src = ObjectReference.fromObject(ref);
+      // GC barrier performs write
       Selected.Mutator.get().objectReferenceWrite(src, src.toAddress().plus(offset), ObjectReference.fromObject(value), offset.toWord(), Word.fromIntZeroExtend(locationMetadata), INSTANCE_FIELD);
-    } else if (VM.VerifyAssertions)
-      VM._assert(false);
+    } else {
+      // we perform write
+      src.toAddress().plus(offset).store(ObjectReference.fromObject(value));
+    }
   }
 
   /**
@@ -1243,12 +1269,18 @@ public class Barriers implements org.mmtk.utility.Constants {
   @Inline
   @Entrypoint
   public static void objectArrayWrite(Object[] ref, int index, Object value) {
+    ObjectReference array = ObjectReference.fromObject(ref);
+    Offset offset = Offset.fromIntZeroExtend(index << MemoryManagerConstants.LOG_BYTES_IN_ADDRESS);
+    // snapshot object
+    if ( ! CHAInterface.noWriteBarrier)
+      RVMThread.getCurrentThread().chaSnapshot(array);
     if (NEEDS_OBJECT_GC_WRITE_BARRIER) {
-      ObjectReference array = ObjectReference.fromObject(ref);
-      Offset offset = Offset.fromIntZeroExtend(index << MemoryManagerConstants.LOG_BYTES_IN_ADDRESS);
+      // GC barrier performs write
       Selected.Mutator.get().objectReferenceWrite(array, array.toAddress().plus(offset), ObjectReference.fromObject(value), offset.toWord(), Word.zero(), ARRAY_ELEMENT);
-    } else if (VM.VerifyAssertions)
-      VM._assert(false);
+    } else {
+      // we perform write
+      array.toAddress().plus(offset).store(ObjectReference.fromObject(value));
+    }
   }
 
   /**
@@ -1262,12 +1294,13 @@ public class Barriers implements org.mmtk.utility.Constants {
   @Inline
   @Entrypoint
   public static Object objectFieldRead(Object ref, Offset offset, int locationMetadata) {
+    ObjectReference src = ObjectReference.fromObject(ref);
     if (NEEDS_OBJECT_GC_READ_BARRIER) {
-      ObjectReference src = ObjectReference.fromObject(ref);
       return Selected.Mutator.get().objectReferenceRead(src, src.toAddress().plus(offset), offset.toWord(), Word.fromIntZeroExtend(locationMetadata), INSTANCE_FIELD).toObject();
-    } else if (VM.VerifyAssertions)
-      VM._assert(false);
-    return null;
+    } else {
+      Object forwardedRef = CHAInterface.getSnapshot(src);
+      return Magic.getObjectAtOffset(forwardedRef, offset);
+    }
   }
 
   /**
@@ -1280,13 +1313,14 @@ public class Barriers implements org.mmtk.utility.Constants {
   @Inline
   @Entrypoint
   public static Object objectArrayRead(Object[] ref, int index) {
+    ObjectReference array = ObjectReference.fromObject(ref);
+    Offset offset = Offset.fromIntZeroExtend(index << MemoryManagerConstants.LOG_BYTES_IN_ADDRESS);
     if (NEEDS_OBJECT_GC_READ_BARRIER) {
-      ObjectReference array = ObjectReference.fromObject(ref);
-      Offset offset = Offset.fromIntZeroExtend(index << MemoryManagerConstants.LOG_BYTES_IN_ADDRESS);
       return Selected.Mutator.get().objectReferenceRead(array, array.toAddress().plus(offset), offset.toWord(), Word.zero(), ARRAY_ELEMENT).toObject();
-    } else if (VM.VerifyAssertions)
-      VM._assert(false);
-    return null;
+    } else {
+      Object forwardedRef = CHAInterface.getSnapshot(array);
+      return Magic.getObjectAtOffset(forwardedRef, offset);
+    }
   }
 
   /**
@@ -1369,17 +1403,39 @@ public class Barriers implements org.mmtk.utility.Constants {
    */
   @Inline
   public static boolean objectTryCompareAndSwap(Object ref, Offset offset, Object old, Object value) {
+    ObjectReference src = ObjectReference.fromObject(ref);
+    Address slot = src.toAddress().plus(offset);
+    ObjectReference oldRef = ObjectReference.fromObject(old);
+    ObjectReference newRef = ObjectReference.fromObject(value);
+    
+    /* The logic for this gets very complicated if we try to make 
+     * snapshotting the object dependent on whether the atomic
+     * write succeeds, so we snapshot the object regardless.  It 
+     * shouldn't hurt anything to occasionally snapshot an object that 
+     * is not modified.
+     */
+    if ( ! CHAInterface.noWriteBarrier)
+      RVMThread.getCurrentThread().chaSnapshot(src);
+
     if (NEEDS_OBJECT_GC_WRITE_BARRIER || NEEDS_OBJECT_GC_READ_BARRIER) {
-      ObjectReference src = ObjectReference.fromObject(ref);
+      // GC barrier attempts write
       return Selected.Mutator.get().objectReferenceTryCompareAndSwap(src,
-          src.toAddress().plus(offset),
-          ObjectReference.fromObject(old),
-          ObjectReference.fromObject(value),
+          slot,
+          oldRef,
+          newRef,
           offset.toWord(),
           Word.zero(), // do not have location metadata
           INSTANCE_FIELD);
-    } else if (VM.VerifyAssertions)
-      VM._assert(false);
-    return false;
+    } else {
+      // we attempt write
+      ObjectReference oldValue;
+      do {
+        oldValue = slot.prepareObjectReference();
+        if (oldValue != oldRef) {
+          return false;
+        }
+      } while (!slot.attempt(oldValue, newRef));
+      return true;
+    }
   }
 }

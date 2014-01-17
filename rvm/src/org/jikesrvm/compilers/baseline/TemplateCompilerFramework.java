@@ -122,6 +122,11 @@ public abstract class TemplateCompilerFramework
    * Is the method currently being compiled unpreemtible?
    */
   protected final boolean isUnpreemptible;
+  
+  /**
+   * Is the method currently being compiled a concurrent check?
+   */
+  protected final boolean isConcurrentCheck;
 
   /**
    * Construct a BaselineCompilerImpl
@@ -149,6 +154,7 @@ public abstract class TemplateCompilerFramework
       isUnpreemptible = method.isUnpreemptible();
     }
     doesCheckStore = !method.hasNoCheckStoreAnnotation();
+    isConcurrentCheck = method.hasConcurrentCheckAnnotation();
 
     // Double check logically uninterruptible methods have been annotated as
     // uninterruptible

@@ -139,4 +139,8 @@ public abstract class Debug {
     return d.isEnabled();
   }
 
+  public boolean validRef(ObjectReference ref) { 
+    return false;
+  }
+  
 }

@@ -16,6 +16,7 @@ import org.mmtk.utility.Log;
 import org.mmtk.utility.options.Options;
 
 import org.mmtk.vm.VM;
+import org.mmtk.vm.DirtyProcessor;
 
 import org.vmmagic.pragma.*;
 
@@ -55,11 +56,6 @@ public abstract class SimpleCollector extends CollectorContext {
       if (!Plan.stacksPrepared()) {
         VM.collection.prepareCollector(this);
       }
-      return;
-    }
-
-    if (phaseId == Simple.PREPARE) {
-      // Nothing to do
       return;
     }
 
@@ -120,6 +116,16 @@ public abstract class SimpleCollector extends CollectorContext {
           VM.phantomReferences.clear();
         else
           VM.phantomReferences.scan(getCurrentTrace(),global().isCurrentGCNursery());
+      }
+      return;
+    }
+    
+    /**
+     * Process dirty lists for Strobe
+     */
+    if (phaseId == Simple.DIRTIES) {
+      if (primary) {
+        VM.dirtyLists.fixDirtyPools(getCurrentTrace(),global().isCurrentGCNursery());
       }
       return;
     }

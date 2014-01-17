@@ -106,4 +106,56 @@ import org.vmmagic.pragma.*;
     return checkDequeue(1);
   }
 
+  /* --------------------------------------------------
+       Support for Strobe: allow us to iterate over
+       the ObjectReferenceDeque without removing the entries
+     -------------------------------------------------- */
+  
+  public Address currAddr = Address.zero();
+  public boolean exhausted = false;
+
+  /**
+   * Must be called before the first call to getNextAddress()
+   * or hasNext(), but after the last modification to the 
+   * ObjectReferenceDeque.  I.e. call this immediately before iterating
+   * over the ObjectReferenceDeque.
+   */
+  public final void prepareIterator() {
+    if (head.EQ(HEAD_INITIAL_VALUE)) {
+      exhausted = true;
+    } else {
+      exhausted = false;
+      currAddr = head;
+    }
+  }
+
+  /**
+   * Iterate over the addresses of each word in the ObjectReferenceDeque.
+   * We assume this is being done during GC and that the ObjectReferenceDeque
+   * is not being accessed by anyone else.
+   * 
+   * @return the address of the next word in the ObjectReferenceDeque, or null
+   * if exhausted
+   */
+  public final Address getNextAddress() {
+    if (exhausted) {
+      return Address.zero();
+    }
+    
+    currAddr = currAddr.minus(BYTES_IN_ADDRESS);
+    if (bufferOffset(currAddr).isZero()) {
+      exhausted = true;
+    }
+    
+    return currAddr;
+  }
+  
+  /**
+   * Will the next call to getNextAddress() return null?
+   * 
+   * @return true if there are more elements, false if not
+   */
+  public boolean hasNext() {
+    return !exhausted;
+  }  
 }

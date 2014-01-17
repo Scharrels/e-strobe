@@ -550,6 +550,87 @@ class Barriers implements BaselineConstants {
     asm.emitCALL_Abs(Magic.getTocPointer().plus(Entrypoints.objectArrayReadBarrierMethod.getOffset()));
     if (pushResult) asm.emitPUSH_Reg(T0);
   }
+  
+  
+  /****************************************************************************
+   * Primitive read barriers
+   ***************************************************************************/
+  
+  /**
+   * TODO: This should be unused.  Boolean array loads should go through
+   * compileByteArrayLoadBarrier since we can't distinguish between the
+   * two cases in the baload bytecode.
+  static void compileBooleanArrayLoadBarrier(Assembler asm, boolean pushResult) {
+    // on entry java stack contains ...|target_array_ref|array_index|
+    // SP -> index, SP+4 -> target_ref
+    BaselineCompilerImpl.genParameterRegisterLoad(asm, 2);
+    asm.emitCALL_Abs(Magic.getTocPointer().plus(Entrypoints.booleanArrayReadBarrierMethod.getOffset()));
+    if (pushResult) asm.emitPUSH_Reg(T0);
+  } */
+  
+  /**
+   * TODO: This method handles both boolean and byte array loads since we 
+   * can't distinguish between the two cases in the baload bytecode.
+   */
+  static void compileByteBooleanArrayLoadBarrier(Assembler asm, boolean pushResult) {
+    // on entry java stack contains ...|target_array_ref|array_index|
+    // SP -> index, SP+4 -> target_ref
+    BaselineCompilerImpl.genParameterRegisterLoad(asm, 2);
+    asm.emitCALL_Abs(Magic.getTocPointer().plus(Entrypoints.byteBooleanArrayReadBarrierMethod.getOffset()));
+    if (pushResult) asm.emitPUSH_Reg(T0);
+  }
+  
+  static void compileShortArrayLoadBarrier(Assembler asm, boolean pushResult) {
+    // on entry java stack contains ...|target_array_ref|array_index|
+    // SP -> index, SP+4 -> target_ref
+    BaselineCompilerImpl.genParameterRegisterLoad(asm, 2);
+    asm.emitCALL_Abs(Magic.getTocPointer().plus(Entrypoints.shortArrayReadBarrierMethod.getOffset()));
+    if (pushResult) asm.emitPUSH_Reg(T0);
+  }
+  
+  static void compileCharArrayLoadBarrier(Assembler asm, boolean pushResult) {
+    // on entry java stack contains ...|target_array_ref|array_index|
+    // SP -> index, SP+4 -> target_ref
+    BaselineCompilerImpl.genParameterRegisterLoad(asm, 2);
+    asm.emitCALL_Abs(Magic.getTocPointer().plus(Entrypoints.charArrayReadBarrierMethod.getOffset()));
+    if (pushResult) asm.emitPUSH_Reg(T0);
+  }
+  
+  static void compileIntArrayLoadBarrier(Assembler asm, boolean pushResult) {
+    // on entry java stack contains ...|target_array_ref|array_index|
+    // SP -> index, SP+4 -> target_ref
+    BaselineCompilerImpl.genParameterRegisterLoad(asm, 2);
+    asm.emitCALL_Abs(Magic.getTocPointer().plus(Entrypoints.intArrayReadBarrierMethod.getOffset()));
+    if (pushResult) asm.emitPUSH_Reg(T0);
+  }
+  
+  static void compileFloatArrayLoadBarrier(Assembler asm, boolean pushResult) {
+    // on entry java stack contains ...|target_array_ref|array_index|
+    // SP -> index, SP+4 -> target_ref
+    BaselineCompilerImpl.genParameterRegisterLoad(asm, 2);
+    asm.emitCALL_Abs(Magic.getTocPointer().plus(Entrypoints.floatArrayReadBarrierMethod.getOffset()));
+    if (pushResult) asm.emitPUSH_Reg(T0);
+  }
+  
+  static void compileLongArrayLoadBarrier(Assembler asm, boolean pushResult) {
+    // on entry java stack contains ...|target_array_ref|array_index|
+    // SP -> index, SP+4 -> target_ref
+    BaselineCompilerImpl.genParameterRegisterLoad(asm, 2);
+    asm.emitCALL_Abs(Magic.getTocPointer().plus(Entrypoints.longArrayReadBarrierMethod.getOffset()));
+    if (pushResult) asm.emitPUSH_Reg(T0);
+  }
+  
+  static void compileDoubleArrayLoadBarrier(Assembler asm, boolean pushResult) {
+    // on entry java stack contains ...|target_array_ref|array_index|
+    // SP -> index, SP+4 -> target_ref
+    BaselineCompilerImpl.genParameterRegisterLoad(asm, 2);
+    asm.emitCALL_Abs(Magic.getTocPointer().plus(Entrypoints.doubleArrayReadBarrierMethod.getOffset()));
+    if (pushResult) asm.emitPUSH_Reg(T0);
+  }
+  
+  /***************************************************************************/
+  
+  
 
   static void compileGetfieldBarrier(Assembler asm, GPR reg, int locationMetadata) {
     //  on entry java stack contains ...|target_ref|
@@ -570,6 +651,174 @@ class Barriers implements BaselineConstants {
     asm.emitCALL_Abs(Magic.getTocPointer().plus(Entrypoints.objectFieldReadBarrierMethod.getOffset()));
     asm.emitPUSH_Reg(T0);
   }
+  
+  
+  /****************************************************************************
+   * Primitive read barriers
+   ***************************************************************************/
+  
+  static void compileBooleanGetfieldBarrier(Assembler asm, GPR reg, int locationMetadata) {
+    //  on entry java stack contains ...|target_ref|
+    //  SP -> target_ref
+    asm.emitPUSH_Reg(reg);
+    asm.emitPUSH_Imm(locationMetadata);
+    BaselineCompilerImpl.genParameterRegisterLoad(asm, 3);
+    genNullCheck(asm, T0);
+    asm.emitCALL_Abs(Magic.getTocPointer().plus(Entrypoints.booleanFieldReadBarrierMethod.getOffset()));
+    asm.emitPUSH_Reg(T0);
+  }
+
+  static void compileBooleanGetfieldBarrierImm(Assembler asm, Offset fieldOffset, int locationMetadata) {
+    asm.emitPUSH_Imm(fieldOffset.toInt());
+    asm.emitPUSH_Imm(locationMetadata);
+    BaselineCompilerImpl.genParameterRegisterLoad(asm, 3);
+    genNullCheck(asm, T0);
+    asm.emitCALL_Abs(Magic.getTocPointer().plus(Entrypoints.booleanFieldReadBarrierMethod.getOffset()));
+    asm.emitPUSH_Reg(T0);
+  }
+  
+  static void compileByteGetfieldBarrier(Assembler asm, GPR reg, int locationMetadata) {
+    //  on entry java stack contains ...|target_ref|
+    //  SP -> target_ref
+    asm.emitPUSH_Reg(reg);
+    asm.emitPUSH_Imm(locationMetadata);
+    BaselineCompilerImpl.genParameterRegisterLoad(asm, 3);
+    genNullCheck(asm, T0);
+    asm.emitCALL_Abs(Magic.getTocPointer().plus(Entrypoints.byteFieldReadBarrierMethod.getOffset()));
+    asm.emitPUSH_Reg(T0);
+  }
+
+  static void compileByteGetfieldBarrierImm(Assembler asm, Offset fieldOffset, int locationMetadata) {
+    asm.emitPUSH_Imm(fieldOffset.toInt());
+    asm.emitPUSH_Imm(locationMetadata);
+    BaselineCompilerImpl.genParameterRegisterLoad(asm, 3);
+    genNullCheck(asm, T0);
+    asm.emitCALL_Abs(Magic.getTocPointer().plus(Entrypoints.byteFieldReadBarrierMethod.getOffset()));
+    asm.emitPUSH_Reg(T0);
+  }
+  
+  static void compileShortGetfieldBarrier(Assembler asm, GPR reg, int locationMetadata) {
+    //  on entry java stack contains ...|target_ref|
+    //  SP -> target_ref
+    asm.emitPUSH_Reg(reg);
+    asm.emitPUSH_Imm(locationMetadata);
+    BaselineCompilerImpl.genParameterRegisterLoad(asm, 3);
+    genNullCheck(asm, T0);
+    asm.emitCALL_Abs(Magic.getTocPointer().plus(Entrypoints.shortFieldReadBarrierMethod.getOffset()));
+    asm.emitPUSH_Reg(T0);
+  }
+
+  static void compileShortGetfieldBarrierImm(Assembler asm, Offset fieldOffset, int locationMetadata) {
+    asm.emitPUSH_Imm(fieldOffset.toInt());
+    asm.emitPUSH_Imm(locationMetadata);
+    BaselineCompilerImpl.genParameterRegisterLoad(asm, 3);
+    genNullCheck(asm, T0);
+    asm.emitCALL_Abs(Magic.getTocPointer().plus(Entrypoints.shortFieldReadBarrierMethod.getOffset()));
+    asm.emitPUSH_Reg(T0);
+  }
+  
+  static void compileCharGetfieldBarrier(Assembler asm, GPR reg, int locationMetadata) {
+    //  on entry java stack contains ...|target_ref|
+    //  SP -> target_ref
+    asm.emitPUSH_Reg(reg);
+    asm.emitPUSH_Imm(locationMetadata);
+    BaselineCompilerImpl.genParameterRegisterLoad(asm, 3);
+    genNullCheck(asm, T0);
+    asm.emitCALL_Abs(Magic.getTocPointer().plus(Entrypoints.charFieldReadBarrierMethod.getOffset()));
+    asm.emitPUSH_Reg(T0);
+  }
+
+  static void compileCharGetfieldBarrierImm(Assembler asm, Offset fieldOffset, int locationMetadata) {
+    asm.emitPUSH_Imm(fieldOffset.toInt());
+    asm.emitPUSH_Imm(locationMetadata);
+    BaselineCompilerImpl.genParameterRegisterLoad(asm, 3);
+    genNullCheck(asm, T0);
+    asm.emitCALL_Abs(Magic.getTocPointer().plus(Entrypoints.charFieldReadBarrierMethod.getOffset()));
+    asm.emitPUSH_Reg(T0);
+  }
+  
+  static void compileIntGetfieldBarrier(Assembler asm, GPR reg, int locationMetadata) {
+    //  on entry java stack contains ...|target_ref|
+    //  SP -> target_ref
+    asm.emitPUSH_Reg(reg);
+    asm.emitPUSH_Imm(locationMetadata);
+    BaselineCompilerImpl.genParameterRegisterLoad(asm, 3);
+    genNullCheck(asm, T0);
+    asm.emitCALL_Abs(Magic.getTocPointer().plus(Entrypoints.intFieldReadBarrierMethod.getOffset()));
+    asm.emitPUSH_Reg(T0);
+  }
+
+  static void compileIntGetfieldBarrierImm(Assembler asm, Offset fieldOffset, int locationMetadata) {
+    asm.emitPUSH_Imm(fieldOffset.toInt());
+    asm.emitPUSH_Imm(locationMetadata);
+    BaselineCompilerImpl.genParameterRegisterLoad(asm, 3);
+    genNullCheck(asm, T0);
+    asm.emitCALL_Abs(Magic.getTocPointer().plus(Entrypoints.intFieldReadBarrierMethod.getOffset()));
+    asm.emitPUSH_Reg(T0);
+  }
+  
+  static void compileFloatGetfieldBarrier(Assembler asm, GPR reg, int locationMetadata) {
+    //  on entry java stack contains ...|target_ref|
+    //  SP -> target_ref
+    asm.emitPUSH_Reg(reg);
+    asm.emitPUSH_Imm(locationMetadata);
+    BaselineCompilerImpl.genParameterRegisterLoad(asm, 3);
+    genNullCheck(asm, T0);
+    asm.emitCALL_Abs(Magic.getTocPointer().plus(Entrypoints.floatFieldReadBarrierMethod.getOffset()));
+    asm.emitPUSH_Reg(T0);
+  }
+
+  static void compileFloatGetfieldBarrierImm(Assembler asm, Offset fieldOffset, int locationMetadata) {
+    asm.emitPUSH_Imm(fieldOffset.toInt());
+    asm.emitPUSH_Imm(locationMetadata);
+    BaselineCompilerImpl.genParameterRegisterLoad(asm, 3);
+    genNullCheck(asm, T0);
+    asm.emitCALL_Abs(Magic.getTocPointer().plus(Entrypoints.floatFieldReadBarrierMethod.getOffset()));
+    asm.emitPUSH_Reg(T0);
+  }
+  
+  static void compileLongGetfieldBarrier(Assembler asm, GPR reg, int locationMetadata) {
+    //  on entry java stack contains ...|target_ref|
+    //  SP -> target_ref
+    asm.emitPUSH_Reg(reg);
+    asm.emitPUSH_Imm(locationMetadata);
+    BaselineCompilerImpl.genParameterRegisterLoad(asm, 3);
+    genNullCheck(asm, T0);
+    asm.emitCALL_Abs(Magic.getTocPointer().plus(Entrypoints.longFieldReadBarrierMethod.getOffset()));
+    asm.emitPUSH_Reg(T0);
+  }
+
+  static void compileLongGetfieldBarrierImm(Assembler asm, Offset fieldOffset, int locationMetadata) {
+    asm.emitPUSH_Imm(fieldOffset.toInt());
+    asm.emitPUSH_Imm(locationMetadata);
+    BaselineCompilerImpl.genParameterRegisterLoad(asm, 3);
+    genNullCheck(asm, T0);
+    asm.emitCALL_Abs(Magic.getTocPointer().plus(Entrypoints.longFieldReadBarrierMethod.getOffset()));
+    asm.emitPUSH_Reg(T0);
+  }
+  
+  static void compileDoubleGetfieldBarrier(Assembler asm, GPR reg, int locationMetadata) {
+    //  on entry java stack contains ...|target_ref|
+    //  SP -> target_ref
+    asm.emitPUSH_Reg(reg);
+    asm.emitPUSH_Imm(locationMetadata);
+    BaselineCompilerImpl.genParameterRegisterLoad(asm, 3);
+    genNullCheck(asm, T0);
+    asm.emitCALL_Abs(Magic.getTocPointer().plus(Entrypoints.doubleFieldReadBarrierMethod.getOffset()));
+    asm.emitPUSH_Reg(T0);
+  }
+
+  static void compileDoubleGetfieldBarrierImm(Assembler asm, Offset fieldOffset, int locationMetadata) {
+    asm.emitPUSH_Imm(fieldOffset.toInt());
+    asm.emitPUSH_Imm(locationMetadata);
+    BaselineCompilerImpl.genParameterRegisterLoad(asm, 3);
+    genNullCheck(asm, T0);
+    asm.emitCALL_Abs(Magic.getTocPointer().plus(Entrypoints.doubleFieldReadBarrierMethod.getOffset()));
+    asm.emitPUSH_Reg(T0);
+  }
+  
+  /***************************************************************************/
+  
 
   static void compileGetstaticBarrier(Assembler asm, GPR reg, int locationMetadata) {
     asm.emitPUSH_Reg(reg);

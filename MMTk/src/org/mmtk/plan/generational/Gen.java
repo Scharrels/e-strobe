@@ -370,7 +370,7 @@ public abstract class Gen extends StopTheWorld {
    * @return true if the object resides within the nursery
    */
   @Inline
-  static boolean inNursery(ObjectReference obj) {
+  public static boolean inNursery(ObjectReference obj) {
     return inNursery(obj.toAddress());
   }
 

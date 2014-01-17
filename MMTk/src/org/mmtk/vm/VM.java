@@ -13,6 +13,7 @@
 package org.mmtk.vm;
 
 import org.mmtk.utility.options.Options;
+import org.mmtk.utility.deque.ObjectReferenceDeque;
 import org.mmtk.utility.gcspy.Color;
 import org.mmtk.utility.gcspy.drivers.AbstractDriver;
 import org.mmtk.vm.gcspy.ByteStream;
@@ -105,6 +106,8 @@ public final class VM {
   @Untraced
   public static final ReferenceProcessor phantomReferences;
   @Untraced
+  public static final DirtyProcessor dirtyLists;
+  @Untraced
   public static final FinalizableProcessor finalizableProcessor;
   @Untraced
   public static final Scanning scanning;
@@ -157,6 +160,7 @@ public final class VM {
     weakReferences = factory.newReferenceProcessor(ReferenceProcessor.Semantics.WEAK);
     softReferences = factory.newReferenceProcessor(ReferenceProcessor.Semantics.SOFT);
     phantomReferences = factory.newReferenceProcessor(ReferenceProcessor.Semantics.PHANTOM);
+    dirtyLists = factory.newDirtyProcessor();
     finalizableProcessor = factory.newFinalizableProcessor();
     scanning = factory.newScanning();
     statistics = factory.newStatistics();

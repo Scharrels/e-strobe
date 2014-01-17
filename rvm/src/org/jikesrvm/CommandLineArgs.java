@@ -15,6 +15,7 @@ package org.jikesrvm;
 import java.io.File;
 import java.util.Arrays;
 import org.jikesrvm.adaptive.controller.Controller;
+import org.jikesrvm.cha.CheckingThread;
 import org.jikesrvm.classloader.RVMClassLoader;
 import org.jikesrvm.compilers.baseline.BaselineCompiler;
 import org.jikesrvm.compilers.baseline.BaselineOptions;
@@ -81,7 +82,8 @@ public class CommandLineArgs {
     BOOTCLASSPATH_P_ARG,
     BOOTCLASSPATH_A_ARG,
     BOOTSTRAP_CLASSES_ARG,
-    PROCESSORS_ARG
+    PROCESSORS_ARG,
+    CHA_THREADS_ARG
   }
 
   /** Represent a single command line prefix */
@@ -182,6 +184,7 @@ public class CommandLineArgs {
                                             new Prefix("-Xbootclasspath/a:", PrefixType.BOOTCLASSPATH_A_ARG),
                                             new Prefix("-X:vmClasses=", PrefixType.BOOTSTRAP_CLASSES_ARG),
                                             new Prefix("-X:processors=", PrefixType.PROCESSORS_ARG),
+                                            new Prefix("-X:CHAthreads=", PrefixType.CHA_THREADS_ARG),
                                             new Prefix("-X:irc:help$", PrefixType.IRC_HELP_ARG),
                                             new Prefix("-X:irc$", PrefixType.IRC_HELP_ARG),
                                             new Prefix("-X:irc:", PrefixType.IRC_ARG),
@@ -551,6 +554,20 @@ public class CommandLineArgs {
             VM.sysExit(VM.EXIT_STATUS_BOGUS_COMMAND_LINE_ARG);
           }
           RVMThread.numProcessors = nProcs;
+          break;
+          
+        case CHA_THREADS_ARG: // "-X:CHAthreads=<n>"
+          int nCHAThreads = primitiveParseInt(arg);
+          if (nCHAThreads < 1) {
+            VM.sysWrite("vm: ", p.value, " needs an argument that is at least 1");
+            VM.sysWriteln(", but found ", arg);
+            VM.sysExit(VM.EXIT_STATUS_BOGUS_COMMAND_LINE_ARG);
+          } else if (nCHAThreads > CheckingThread.MAX_CHA_THREADS) {
+            VM.sysWrite("vm: ", p.value, " needs an argument that is less than or equal to ", CheckingThread.MAX_CHA_THREADS);
+            VM.sysWriteln(", but found ", arg);
+            VM.sysExit(VM.EXIT_STATUS_BOGUS_COMMAND_LINE_ARG);
+          }
+          RVMThread.numCHAThreads = nCHAThreads;
           break;
 
           // -------------------------------------------------------------------

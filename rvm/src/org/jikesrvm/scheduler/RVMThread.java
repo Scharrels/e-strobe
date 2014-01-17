@@ -36,9 +36,11 @@ import org.jikesrvm.compilers.common.CompiledMethods;
 import org.jikesrvm.osr.ObjectHolder;
 import org.jikesrvm.adaptive.OSRListener;
 import org.jikesrvm.jni.JNIEnvironment;
+import org.jikesrvm.mm.mminterface.CHAInterface;
 import org.jikesrvm.mm.mminterface.MemoryManager;
 import org.jikesrvm.mm.mminterface.ThreadContext;
 import org.jikesrvm.mm.mminterface.CollectorThread;
+import org.jikesrvm.objectmodel.MiscHeader;
 import org.jikesrvm.objectmodel.ObjectModel;
 import org.jikesrvm.objectmodel.ThinLockConstants;
 import org.jikesrvm.runtime.Entrypoints;
@@ -62,9 +64,12 @@ import org.vmmagic.pragma.UnpreemptibleNoWarn;
 import org.vmmagic.pragma.Untraced;
 import org.vmmagic.pragma.NoCheckStore;
 import org.vmmagic.unboxed.Address;
+import org.vmmagic.unboxed.ObjectReference;
 import org.vmmagic.unboxed.Word;
 import org.vmmagic.unboxed.Offset;
 import static org.jikesrvm.runtime.SysCall.sysCall;
+
+import org.jikesrvm.cha.Snapshot;
 import org.jikesrvm.classloader.RVMMethod;
 import org.jikesrvm.compilers.opt.runtimesupport.OptCompiledMethod;
 import org.jikesrvm.compilers.opt.runtimesupport.OptMachineCodeMap;
@@ -148,6 +153,10 @@ import org.jikesrvm.tuningfork.Feedlet;
 @Uninterruptible
 @NonMoving
 public class RVMThread extends ThreadContext {
+  
+  public static int skippedWBCount = 0;
+  public static int enteredWBCount = 0;
+  
   /*
    * debug and statistics
    */
@@ -369,6 +378,14 @@ public class RVMThread extends ThreadContext {
 
   /** Name of the thread (can be changed during execution) */
   private String name;
+
+  /** Do snapshots in this thread? */
+  protected boolean doSnapshots;
+
+  /** Checker id 
+   * -1 for non-checker threads, >= 0 for checker threads
+   */
+  public int checkerId = -1;
 
   /**
    * The virtual machine terminates when the last non-daemon (user) thread
@@ -965,6 +982,12 @@ public class RVMThread extends ThreadContext {
    * collector threads and the such.
    */
   public static int numProcessors = 1;
+  
+  /**
+   * Number of concurrent heap assertions checking threads that the user wants 
+   * us to use.
+   */
+  public static int numCHAThreads = 1;
 
   /**
    * Thread handle. Currently stores pthread_t, which we assume to be no larger
@@ -1152,7 +1175,12 @@ public class RVMThread extends ThreadContext {
    * The Feedlet instance for this thread to use to make addEvent calls.
    */
   public Feedlet feedlet;
-
+  
+  /*
+   * CHA support
+   */
+  public CHAInterface chaInterface;
+  
   /**
    * Get a NoYieldpointsCondLock for a given thread slot.
    */
@@ -1472,7 +1500,14 @@ public class RVMThread extends ThreadContext {
     this.exceptionRegisters = this.exceptionRegistersShadow = new Registers();
     if (VM.runningVM) {
       feedlet = TraceEngine.engine.makeFeedlet(name, name);
+      chaInterface = new CHAInterface();
     }
+
+    if (! daemon)
+      this.doSnapshots = true;
+    else
+      this.doSnapshots = false;
+
     if (VM.VerifyAssertions)
       VM._assert(stack != null);
     // put self in list of threads known to scheduler and garbage collector
@@ -2569,7 +2604,7 @@ public class RVMThread extends ThreadContext {
    * and resuming execution in some other (ready) thread.
    */
   @Interruptible
-  public final void terminate() {
+  public final void terminate() {    
     if (traceAcct)
       VM.sysWriteln("in terminate() for Thread #", threadSlot);
     if (VM.VerifyAssertions)
@@ -2582,7 +2617,7 @@ public class RVMThread extends ThreadContext {
       VM.sysWriteln("END Verbosely dumping stack at time of creating thread termination ]");
       VM.enableGC();
     }
-
+    
     // allow java.lang.Thread.exit() to remove this thread from ThreadGroup
     java.lang.JikesRVMSupport.threadDied(thread);
 
@@ -2737,6 +2772,8 @@ public class RVMThread extends ThreadContext {
     addAboutToTerminate();
     // NB we can no longer do anything that would lead to write barriers or
     // GC
+    
+    // assertDirtyListsFlushed();
 
     if (traceAcct) {
       VM.sysWriteln("acquireCount for my monitor: ", monitor().acquireCount);
@@ -3401,7 +3438,6 @@ public class RVMThread extends ThreadContext {
   public static void hardHandshakeSuspend(BlockAdapter ba,
                                           HardHandshakeVisitor hhv) {
     long before=sysCall.sysNanoTime();
-
     RVMThread current=getCurrentThread();
 
     handshakeLock.lockWithHandshake();
@@ -4043,6 +4079,39 @@ public class RVMThread extends ThreadContext {
    */
   public final String getName() {
     return name;
+  }
+
+  /*
+   * Should we make snapshots?
+   */
+  @Inline
+  public final boolean makeSnapshots() {
+    return doSnapshots;
+  }
+
+  /*
+   * Turn off snapshots
+   */
+  @Inline
+  public final void turnOffSnapshots() {
+    doSnapshots = false;
+  }
+
+  /*
+   * Turn on snapshots
+   */
+  @Inline
+  public final void turnOnSnapshots() {
+    doSnapshots = true;
+  }
+
+  /* Cheesy way to avoid extra allocation */
+  public Object [] buffer = null;
+  public Object [] getBuffer(int size) {
+    if (buffer == null) {
+      buffer = new Object[size];
+    }
+    return buffer;
   }
 
   /**
@@ -5080,4 +5149,89 @@ public class RVMThread extends ThreadContext {
     sloppyExecStatusHistogram[oldState]++;
     sloppyExecStatusHistogram[newState]++;
   }
+  
+  /**
+   * This method snapshots an object for concurrent heap assertions.
+   * It is meant to be used in the CHA write barrier but does not
+   * perform the write.
+   * 
+   * Notice the double-checked lock here.  We do this for efficiency
+   * since we believe the common case will be that there are no 
+   * active probes.  Before this optimization the overhead was
+   * roughly 3x!
+   * 
+   * @param src The object to snapshot
+   */
+  @Inline @Uninterruptible
+  public void chaSnapshot(ObjectReference src) {
+    //boolean enteredWB = false;
+    // if (Snapshot.activeProbes != 0) {    // at least one active probe
+
+    int epoch = Snapshot.epoch;
+    if (Snapshot.activeProbes != 0) {
+      if (MiscHeader.attemptEpoch(src, Word.fromIntSignExtend(epoch))) {
+        setInWriteBarrier();
+        //enteredWB = true;
+        Snapshot.snapshotObject(src, chaInterface, epoch);
+        MiscHeader.setEpoch(src, Word.fromIntSignExtend(epoch));
+        setNotInWriteBarrier();
+      }
+    }
+
+      /*
+      if (enteredWB) {
+        enteredWBCount++;
+        if (enteredWBCount % 1000 == 0) {
+          VM.sysWrite("enteredWBCount = ");
+          VM.sysWriteln(enteredWBCount);
+        }
+      } else {
+        skippedWBCount++;
+        if (skippedWBCount % 100000 == 0) {
+          VM.sysWrite("skippedWBCount = ");
+          VM.sysWriteln(skippedWBCount);
+        }
+      }
+      */
+      // }
+   
+  } 
+
+  /**
+   * Flush local dirty buffers
+   *
+   * Flush any dirty forwarding arrays to the global
+   * SharedDeques. Called by SimpleMutator during GC.
+   */
+  @Inline @Override
+  public void flushDirtyBuffers()
+  {
+    if (chaInterface != null)
+      chaInterface.flushDirtyBuffers();
+  }    
+
+  /**
+   * Flush thread-local dirty lists to global dirtylist pools
+   * DEPRECATED: only flush dirty lists when we're about
+   *  to process them in completeProbe
+  @Inline @Override
+  public void flushDirtyLists() {
+    VM.tsysWriteln("START RVMThread.flushDirtyLists");
+    VM.tsysWriteln(this.name);
+    if (chaInterface != null)
+      chaInterface.flushDirtyLists();
+    VM.tsysWriteln("DONE RVMThread.flushDirtyLists");
+  }
+  */
+    
+  /**
+   * Assert that the dirty lists have been flushed.  This is critical to
+   * correctness.  We need to maintain the invariant that dirty list entries
+   * do not accrue during GC.
+  public void assertDirtyListsFlushed() {
+    if (VM.VerifyAssertions && chaInterface != null) {
+      VM._assert(chaInterface.isDirtyListsFlushed());
+    }
+  }
+  */
 }
