@@ -54,6 +54,8 @@ public class ClassFileReader implements Constants, ClassLoaderConstants {
         break;
       case 50: // we only support up to 50.0 (ie Java 1.6.0)
         if (minor == 0) break;
+      case 51:
+	break;
       default:
         throw new UnsupportedClassVersionError("unsupported class file version " + major + "." + minor);
     }
