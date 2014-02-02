@@ -1157,7 +1157,7 @@ Check to make sure all required properties are specified. This includes properti
     </if>
 
     <mkdir dir="${build.base}/syscall/java"/>
-    <exec executable="apt" failonerror="true">
+    <exec executable="/usr/lib/jvm/java-7-openjdk-i386/bin/apt" failonerror="true">
       <arg value="-factorypath"/>
       <arg value="${tasks.classes}"/>
       <arg value="-nocompile"/>
