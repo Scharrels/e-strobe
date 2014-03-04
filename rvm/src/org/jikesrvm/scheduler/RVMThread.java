@@ -31,6 +31,7 @@ import org.jikesrvm.Services;
 import org.jikesrvm.UnimplementedError;
 import org.jikesrvm.adaptive.OnStackReplacementEvent;
 import org.jikesrvm.adaptive.measurements.RuntimeMeasurements;
+import org.jikesrvm.classloader.RVMType;
 import org.jikesrvm.compilers.common.CompiledMethod;
 import org.jikesrvm.compilers.common.CompiledMethods;
 import org.jikesrvm.osr.ObjectHolder;
@@ -386,6 +387,11 @@ public class RVMThread extends ThreadContext {
    * -1 for non-checker threads, >= 0 for checker threads
    */
   public int checkerId = -1;
+
+    /** Snapshot id
+     * -1 for live threads, >= 0 for snapshots
+     */
+  public int snapshotId = -1;
 
   /**
    * The virtual machine terminates when the last non-daemon (user) thread
@@ -1502,11 +1508,11 @@ public class RVMThread extends ThreadContext {
       feedlet = TraceEngine.engine.makeFeedlet(name, name);
       chaInterface = new CHAInterface();
     }
-
-    if (! daemon)
+    if (! daemon){
       this.doSnapshots = true;
-    else
-      this.doSnapshots = false;
+    } else {
+        this.doSnapshots = false;
+    }
 
     if (VM.VerifyAssertions)
       VM._assert(stack != null);
@@ -5168,7 +5174,7 @@ public class RVMThread extends ThreadContext {
     // if (Snapshot.activeProbes != 0) {    // at least one active probe
 
     int epoch = Snapshot.epoch;
-    if (Snapshot.activeProbes != 0) {
+    if (CHAInterface.curActiveSnapshots != 0){
       if (MiscHeader.attemptEpoch(src, Word.fromIntSignExtend(epoch))) {
         setInWriteBarrier();
         //enteredWB = true;

@@ -16,6 +16,7 @@ import java.io.DataInputStream;
 import java.io.IOException;
 import java.lang.annotation.Annotation;
 
+import org.jikesrvm.scheduler.RVMThread;
 import org.vmmagic.pragma.Uninterruptible;
 import org.jikesrvm.VM;
 
@@ -381,6 +382,7 @@ public abstract class AnnotatedElement implements java.lang.reflect.AnnotatedEle
    * @see org.vmmagic.pragma.ConcurrentCheck
    */
   public final boolean hasConcurrentCheckAnnotation() {
-    return isAnnotationDeclared(TypeReference.ConcurrentCheck);
+      return VM.runningVM && (!RVMThread.getCurrentThread().isDaemonThread() || RVMThread.getCurrentThread().checkerId > -1);
+//    return isAnnotationDeclared(TypeReference.ConcurrentCheck);
   }
 }

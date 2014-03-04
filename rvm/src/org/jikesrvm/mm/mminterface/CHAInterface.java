@@ -3,6 +3,7 @@ package org.jikesrvm.mm.mminterface;
 import org.jikesrvm.SizeConstants;
 import org.jikesrvm.cha.CheckingThread;
 import org.jikesrvm.cha.CHATransitiveClosure;
+import org.jikesrvm.cha.Snapshot;
 import org.jikesrvm.classloader.RVMArray;
 import org.jikesrvm.classloader.RVMClass;
 import org.jikesrvm.classloader.RVMType;
@@ -48,9 +49,8 @@ public class CHAInterface implements SizeConstants {
    * maxActiveCheckers is used for profiling to keep track of the 
    * maximum number of checker threads active at any one time. 
    */
-  public static int maxActiveCheckers = 0;
-
-  public static int curActiveCheckers = 0;
+  public static volatile int maxActiveSnapshots = 0;
+  public static volatile int curActiveSnapshots = 0;
 
   public static final boolean verbose = false;
 
@@ -85,7 +85,7 @@ public class CHAInterface implements SizeConstants {
    * used during GC.
    */
   public static void init() {
-    dirtyPools = new SharedDeque[RVMThread.numCHAThreads]; // [CheckingThread.MAX_CHA_THREADS];
+    dirtyPools = new SharedDeque[Snapshot.MAX_SNAPSHOTS]; // [CheckingThread.MAX_CHA_THREADS];
     for (int i=0; i<dirtyPools.length; i++) {
       dirtyPools[i] = new SharedDeque("dirtyPool" + i, Selected.Plan.metaDataSpace, 1);
       dirtyPools[i].prepareNonBlocking();
@@ -171,7 +171,7 @@ public class CHAInterface implements SizeConstants {
   
   /**
    * Get a list of references from an object.  Do not follow forwarding
-   * pointer; scan *this* object.  
+   * pointer; scan *this* object.
    */
   public static ObjectReferenceArray getRefs(ObjectReference objectRef) {
     ObjectReferenceArray result = null;
@@ -204,7 +204,7 @@ public class CHAInterface implements SizeConstants {
   @Uninterruptible
   public static ObjectReferenceArray allocForwardingArray() {
         
-    int numElements = RVMThread.numCHAThreads; // CheckingThread.MAX_CHA_THREADS;
+    int numElements = Snapshot.MAX_SNAPSHOTS; // CheckingThread.MAX_CHA_THREADS;
 
     RVMArray arrayType = RVMType.ObjectReferenceArrayType;
     int headerSize = ObjectModel.computeArrayHeaderSize(arrayType);
@@ -403,7 +403,7 @@ public class CHAInterface implements SizeConstants {
    **********************************************************************/
   
   public CHAInterface() {
-    dirties = new ObjectReferenceDeque[RVMThread.numCHAThreads]; // [CheckingThread.MAX_CHA_THREADS];
+    dirties = new ObjectReferenceDeque[Snapshot.MAX_SNAPSHOTS]; // [CheckingThread.MAX_CHA_THREADS];
     for (int i=0; i<dirties.length; i++) {
       dirties[i] = new ObjectReferenceDeque("dirty" + i, dirtyPools[i]);
     }

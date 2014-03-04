@@ -40,29 +40,33 @@ public class Snapshot implements HeapLayoutConstants {
 
   // -- Manage the epoch counter
   private static Object epochLock;
-  public static int epoch = 1;   
+  public static int epoch = 1;
   public static final Word HEAP_MIN = BOOT_IMAGE_DATA_START.toWord();
   
   public static int copyCount = 0;
 
   public static int [] dirtyCounts;
+
+  public static final int MAX_SNAPSHOTS = 1000;
    
   /**
    * This is a bitmap indicating which probes are active.  It is 
    * protected by a read-write lock.
    */
-  public static volatile int activeProbes;
+  //public static volatile int activeProbes;
+  /* 1000 snapshots doesn't fit in an int. Use a bool[]. */
+  public static volatile boolean[] activeProbes;
   // public static ReadWriteLock activeProbeLock;
   public static Monitor activeProbeLock;
-  public static Address activeProbesAddress;
+//  public static Address activeProbesAddress;
 
   public static void init() {
     epochLock = new Object();
     // activeProbeLock = new ReadWriteLock();
     activeProbeLock = new Monitor();
     if (trace) VM.tsysWriteln("initialized snapshot");
-    dirtyCounts = new int[12];
-    activeProbesAddress = Statics.getSlotAddress(Entrypoints.activeProbesField.getOffset());
+    dirtyCounts = new int[MAX_SNAPSHOTS];
+    activeProbes = new boolean[MAX_SNAPSHOTS];
   }
 
   /**
@@ -82,9 +86,9 @@ public class Snapshot implements HeapLayoutConstants {
    * 
    * @param id The id of the probe thread that has been initiated
    */
-  public static void initiateProbe(int id) {
+  public static int initiateProbe() {
     if (trace) VM.tsysWriteln("Initiating probe ");
-    
+
     // increment epoch while holding the lock
     synchronized(epochLock) {
       int lastEpoch = epoch;
@@ -95,40 +99,46 @@ public class Snapshot implements HeapLayoutConstants {
     // activeProbeLock.getWriteLock();
 
     // VM.tsysWriteln("  Start-1 ", (1 << id), " -> ", activeProbes);
+    int id = -1;
+    for(int i = 0; i < MAX_SNAPSHOTS; i++){
+        if(!activeProbes[i]){
+            id = i;
+            break;
+        }
+    }
 
     if (VM.VerifyAssertions) {
       // probe should be inactive
-      VM._assert((1 << id & activeProbes) == 0);
+      VM._assert(!activeProbes[id]);
     }
 
-    activeProbes = activeProbes | (1 << id);
+    activeProbes[id] = true;
     Magic.sync();
-
-    int check = activeProbesAddress.loadInt();
-    // VM.tsysWriteln("Check active probes: ", activeProbes, " and ", check);
 
     if (VM.VerifyAssertions) {
       // probe should be active
-      VM._assert((1 << id & activeProbes) != 0);
+      VM._assert(activeProbes[id]);
     }
 
     // VM.tsysWriteln("  Start-2 ", (1 << id), " -> ", activeProbes);
 
     int count = 0;
-    for (int i=0; i<CheckingThread.MAX_CHA_THREADS; i++) {
-      if ((activeProbes & (1 << i)) != 0) {
+    for (int i=0; i<MAX_SNAPSHOTS; i++) {
+      if (activeProbes[i]) {
         count++;
       }
     }
-    if (count > CHAInterface.maxActiveCheckers) {
-      CHAInterface.maxActiveCheckers = count;
+    if (count > CHAInterface.maxActiveSnapshots) {
+      CHAInterface.maxActiveSnapshots = count;
     }
 
-    CHAInterface.curActiveCheckers++;
+    CHAInterface.curActiveSnapshots++;
     dirtyCounts[id] = 0;
 
     activeProbeLock.unlock();
     // activeProbeLock.releaseLock();
+    if (trace) VM.tsysWriteln("Initiated probe id" + id);
+    return id;
   }
   
   /**
@@ -158,18 +168,21 @@ public class Snapshot implements HeapLayoutConstants {
 
     if (VM.VerifyAssertions) {
       // probe must be active
-      VM._assert((activeProbes & (1 << id)) != 0);
+      VM._assert(activeProbes[id]);
     }
-    activeProbes = activeProbes & ~(1 << id);
+    if (trace) VM.tsysWriteln("Disable activeprobes id " + id);
+    activeProbes[id] = false;
+    if (trace) VM.tsysWriteln("Before sync");
     Magic.sync();
+    if (trace) VM.tsysWriteln("After sync");
 
-    CHAInterface.curActiveCheckers--;
+    CHAInterface.curActiveSnapshots--;
 
     // VM.tsysWriteln("  Clear-2 ", (1 << id), " -> ", activeProbes);
 
     activeProbeLock.unlock();
     // activeProbeLock.releaseLock();
-    
+
     // unmark dirty objects - only need one dirty pool
     /*
     if (trace) VM.tsysWriteln("Unmarking dirty objects");
@@ -182,10 +195,12 @@ public class Snapshot implements HeapLayoutConstants {
     */
 
     CHAInterface chaInterface = RVMThread.getCurrentThread().chaInterface;
-    if (chaInterface != null) {
-      chaInterface.clearSnapshots(id, dirtyCounts[id]);
-      dirtyCounts[id] = 0;
+    if (VM.VerifyAssertions) {
+        VM._assert (chaInterface != null);
     }
+    if (trace) VM.tsysWriteln("Clearing dirties for snapshot " + id);
+    chaInterface.clearSnapshots(id, dirtyCounts[id]);
+    dirtyCounts[id] = 0;
 
     if (trace) VM.tsysWriteln("DONE cleanup");
 
@@ -282,8 +297,8 @@ public class Snapshot implements HeapLayoutConstants {
 
       // install pointers in forwarding array
       // for (int i=0; i<CheckingThread.MAX_CHA_THREADS; i++) {
-      for (int i=0; i < RVMThread.numCHAThreads; i++) {
-        if ((activeProbes & (1 << i)) != 0) {
+      for (int i=0; i < MAX_SNAPSHOTS; i++) {
+        if (activeProbes[i]) {
           // VM.tsysWriteln("  Add ", (1 << i), " -- ", activeProbes);
 
           if (forwardingArr.get(i).isNull()) {

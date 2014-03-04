@@ -116,7 +116,7 @@ public final class Statistics extends org.mmtk.vm.Statistics implements Constant
    */
   public int getNumCheckers()
   {
-    return CHAInterface.curActiveCheckers;
+    return CHAInterface.curActiveSnapshots;
   }
 
   /**

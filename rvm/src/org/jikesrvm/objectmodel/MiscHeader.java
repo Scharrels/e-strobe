@@ -386,19 +386,22 @@ public final class MiscHeader implements Constants, MiscHeaderConstants {
   @Uninterruptible
   public static ObjectReference getSnapshot(ObjectReference objRef)
   {
+    if(RVMThread.getCurrentThread().snapshotId == -1){
+        return objRef;
+    }
     // Lock the object's epoch word
     Word epoch = MiscHeader.attemptEpoch2(objRef); 
     
     ObjectReference getRefsFrom;
     // Get forwarding pointer
     ObjectReferenceArray snapshotArray = getSnapshotArray(objRef);
+    RVMThread thisThread = RVMThread.getCurrentThread();
     if (snapshotArray == null) {
       getRefsFrom = objRef;
       // count_notforwarded++;
     } else {
       // CheckingThread thisThread = (CheckingThread)RVMThread.getCurrentThread();
-      RVMThread thisThread = RVMThread.getCurrentThread();
-      ObjectReference snapshot = snapshotArray.get(thisThread.checkerId);
+      ObjectReference snapshot = snapshotArray.get(thisThread.snapshotId);
       if (snapshot.isNull()) {
         getRefsFrom = objRef;
         // count_forwardednull++;
@@ -558,7 +561,7 @@ public final class MiscHeader implements Constants, MiscHeaderConstants {
     Word oldValue;
     do {
       oldValue = object.toAddress().prepareWord(EPOCH_OFFSET);
-      if (oldValue.EQ(currEpoch)) return false;
+        if (oldValue.EQ(currEpoch)) return false;
     } while (oldValue.EQ(BEING_COPIED) || !object.toAddress().attempt(oldValue, BEING_COPIED, EPOCH_OFFSET));
     return true;
   }

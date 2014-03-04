@@ -123,7 +123,9 @@ import java.util.concurrent.ArrayBlockingQueue;
 
       // -- Clean up, disabling write barrier
       if (trace) VM.tsysWriteln("Checker: ...check complete");
-      Snapshot.completeProbe(checkerId);
+      int oldId = snapshotId;
+      snapshotId = -1;
+      Snapshot.completeProbe(oldId);
       checkToDo = null;
 
       numLock.lockNoHandshake();
@@ -225,7 +227,7 @@ import java.util.concurrent.ArrayBlockingQueue;
       if (checkerWaiting) {
         checkToDo = future;
         waitLock.broadcast();
-        Snapshot.initiateProbe(checkerId);
+        snapshotId = Snapshot.initiateProbe();
         waitLock.unlock();
         break;
       } else {

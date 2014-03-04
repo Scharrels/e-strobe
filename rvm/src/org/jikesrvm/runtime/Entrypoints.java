@@ -446,13 +446,6 @@ public class Entrypoints {
       getField(org.jikesrvm.compilers.baseline.EdgeCounts.class, "data", int[][].class);
 
   //////////////////
-  // Entrypoint for Strobe
-  //////////////////
-
-  public static final RVMField activeProbesField = getField(org.jikesrvm.cha.Snapshot.class,
-                                                            "activeProbes", int.class);
-
-  //////////////////
   // Entrypoints that are valid only when the opt compiler is included in the build
   //////////////////
   public static final RVMField specializedMethodsField;
