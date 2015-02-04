@@ -17,6 +17,8 @@ import java.util.concurrent.ArrayBlockingQueue;
   public static int numActiveCheckers = 0;
   public static Monitor numLock;
 
+  private int snapshotId;
+
   // Task and associated monitor
   //public static CHAFuture newTask = null;
   //public static NoYieldpointsMonitor taskLock = null;
@@ -119,13 +121,14 @@ import java.util.concurrent.ArrayBlockingQueue;
 
       // -- Perform computation
       if (trace) VM.tsysWriteln("Checker: Start check...");
+      switchToSnapshot(snapshotId);
       checkToDo.compute();
+      switchToLive();
 
       // -- Clean up, disabling write barrier
       if (trace) VM.tsysWriteln("Checker: ...check complete");
-      int oldId = snapshotId;
+      Snapshot.completeProbe(snapshotId);
       snapshotId = -1;
-      Snapshot.completeProbe(oldId);
       checkToDo = null;
 
       numLock.lockNoHandshake();

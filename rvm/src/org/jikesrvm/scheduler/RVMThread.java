@@ -391,7 +391,22 @@ public class RVMThread extends ThreadContext {
     /** Snapshot id
      * -1 for live threads, >= 0 for snapshots
      */
-  public int snapshotId = -1;
+  private int snapshotId = -1;
+
+  public int getSnapshotId(){
+      return snapshotId;
+  }
+
+  public void switchToSnapshot(int snapshotId) {
+      if(!Snapshot.activeProbes[snapshotId]){
+          throw new SnapshotInactiveException(snapshotId);
+      }
+      this.snapshotId = snapshotId;
+  }
+
+  public void switchToLive(){
+      this.snapshotId = -1;
+  }
 
   /**
    * The virtual machine terminates when the last non-daemon (user) thread

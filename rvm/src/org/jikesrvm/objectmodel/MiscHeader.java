@@ -386,7 +386,7 @@ public final class MiscHeader implements Constants, MiscHeaderConstants {
   @Uninterruptible
   public static ObjectReference getSnapshot(ObjectReference objRef)
   {
-    if(RVMThread.getCurrentThread().snapshotId == -1){
+    if(RVMThread.getCurrentThread().getSnapshotId() == -1){
         return objRef;
     }
     // Lock the object's epoch word
@@ -401,7 +401,7 @@ public final class MiscHeader implements Constants, MiscHeaderConstants {
       // count_notforwarded++;
     } else {
       // CheckingThread thisThread = (CheckingThread)RVMThread.getCurrentThread();
-      ObjectReference snapshot = snapshotArray.get(thisThread.snapshotId);
+      ObjectReference snapshot = snapshotArray.get(thisThread.getSnapshotId());
       if (snapshot.isNull()) {
         getRefsFrom = objRef;
         // count_forwardednull++;
